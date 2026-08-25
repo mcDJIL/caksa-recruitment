@@ -55,7 +55,7 @@ jobs:
             test -f .env
             git fetch origin main
             git reset --hard origin/main
-            docker compose up -d --build api
+            docker compose --env-file .env up -d --build --remove-orphans api
             docker image prune -f
 
   deploy-web:
@@ -79,5 +79,5 @@ jobs:
             test -f .env
             git fetch origin main
             git reset --hard origin/main
-            docker compose up -d --build web
+            docker compose --env-file .env up -d --build --remove-orphans web
             docker image prune -f
