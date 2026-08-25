@@ -10,13 +10,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.0",
-    "caksa-web": "file:../..",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "express-rate-limit": "^8.2.1",
-    "frontend": "file:../frontend",
     "googleapis": "^176.0.0",
     "helmet": "^8.1.0",
     "multer": "^2.2.0"
