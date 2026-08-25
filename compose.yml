@@ -1,0 +1,37 @@
+name: caksa-rec
+
+services:
+  api:
+    build:
+      context: ./backend
+    image: caksarec-be:latest
+    container_name: caksarec-api
+    restart: unless-stopped
+    env_file:
+    - ./backend/.env
+    ports:
+      - "127.0.0.1:${CONTAINER_PORT}:3000"
+    networks:
+      - app-network
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_RECRUITMENT_API_URL: ${VITE_RECRUITMENT_API_URL}
+    image: caksarec-fe:latest
+    container_name: caksarec-web
+    restart: unless-stopped
+    env_file:
+    - ./frontend/.env
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${CONTAINER_PORT}:80"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    name: caksarec-network

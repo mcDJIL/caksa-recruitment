@@ -1,0 +1,83 @@
+name: Deploying a Drone...
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Changed Files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'backend/**'
+              - 'compose.yml'
+              - '.github/workflows/**'
+            web:
+              - 'frontend/**'
+              - 'compose.yml'
+              - '.github/workflows/**'
+
+  deploy-api:
+    name: Deploy API
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy API over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            APP_DIR="${{ secrets.VPS_APP_DIR || '/home/developer/caksa-recruitment' }}"
+            cd "$APP_DIR"
+            test -f .env
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose up -d --build api
+            docker image prune -f
+
+  deploy-web:
+    name: Deploy Web
+    needs: [detect-changes, deploy-api]
+    if: ${{ always() && (needs.detect-changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch') && (needs.deploy-api.result == 'success' || needs.deploy-api.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Web over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            APP_DIR="${{ secrets.VPS_APP_DIR || '/home/developer/caksa-recruitment' }}"
+            cd "$APP_DIR"
+            test -f .env
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose up -d --build web
+            docker image prune -f
