@@ -52,10 +52,12 @@ jobs:
             set -e
             APP_DIR="${{ secrets.VPS_APP_DIR || '/home/developer/caksa-recruitment' }}"
             cd "$APP_DIR"
-            test -f .env
+            test -f backend/.env || test -f .env
+
             git fetch origin main
             git reset --hard origin/main
-            docker compose --env-file .env up -d --build --remove-orphans api
+
+            docker compose up -d --build api
             docker image prune -f
 
   deploy-web:
@@ -76,8 +78,9 @@ jobs:
             set -e
             APP_DIR="${{ secrets.VPS_APP_DIR || '/home/developer/caksa-recruitment' }}"
             cd "$APP_DIR"
-            test -f .env
+            test -f frontend/.env || test -f .env
+
             git fetch origin main
             git reset --hard origin/main
-            docker compose --env-file .env up -d --build --remove-orphans web
+            docker compose up -d --build web
             docker image prune -f
