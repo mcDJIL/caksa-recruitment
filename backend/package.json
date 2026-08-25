@@ -1,0 +1,32 @@
+{
+  "name": "recruitment-caksa-backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.0",
+    "caksa-web": "file:../..",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
+    "frontend": "file:../frontend",
+    "googleapis": "^176.0.0",
+    "helmet": "^8.1.0",
+    "multer": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.5",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "^6.0.2"
+  }
+}
