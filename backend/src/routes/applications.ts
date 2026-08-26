@@ -71,7 +71,7 @@ const trackingRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
-const normalizedCode = (value: string | string[]): string =>
+const normalizeNrp = (value: string | string[]): string =>
   (Array.isArray(value) ? value[0] : value).trim().toUpperCase();
 
 const hasFile = (files: UploadedFile[], fieldName: string): boolean =>
@@ -826,13 +826,13 @@ router.get('/export', requireAdmin, async (request, response, next) => {
   }
 });
 
-router.get('/:code', trackingRateLimit, async (request, response, next) => {
+router.get('/:nrp', trackingRateLimit, async (request, response, next) => {
   try {
-    const code = normalizedCode(request.params.code);
+    const nrp = normalizeNrp(request.params.nrp);
     const { data, error } = await supabase
       .from('recruitment_applications')
-      .select('application_code, status, updated_at')
-      .eq('application_code', code)
+      .select('nrp, status, updated_at')
+      .eq('nrp', nrp)
       .maybeSingle();
 
     if (error) throw error;
@@ -893,7 +893,7 @@ router.get('/', requireAdmin, async (request, response, next) => {
   }
 });
 
-router.patch('/:code/status', requireAdmin, async (request, response, next) => {
+router.patch('/:nrp/status', requireAdmin, async (request, response, next) => {
   try {
     const status = request.body?.status as ApplicationStatus;
     if (!applicationStatuses.includes(status)) {
@@ -904,8 +904,8 @@ router.patch('/:code/status', requireAdmin, async (request, response, next) => {
     const { data, error } = await supabase
       .from('recruitment_applications')
       .update({ status })
-      .eq('application_code', normalizedCode(request.params.code))
-      .select('application_code, status, updated_at')
+      .eq('nrp', normalizeNrp(request.params.nrp))
+      .select('nrp, status, updated_at')
       .maybeSingle();
 
     if (error) throw error;
