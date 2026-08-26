@@ -38,6 +38,9 @@ const upload = multer({
 });
 
 type UploadedFile = Express.Multer.File;
+
+class ApplicationValidationError extends Error {}
+
 type ApplicationStatus =
   | 'PENDING'
   | 'ADMINISTRATION'
@@ -57,7 +60,7 @@ const applicationStatuses: ApplicationStatus[] = [
 
 const requiredString = (value: unknown, field: string): string => {
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`${field} is required`);
+    throw new ApplicationValidationError(`${field} is required`);
   }
   return value.trim();
 };
@@ -124,30 +127,30 @@ const validateApplicationRequirements = (body: Record<string, unknown>, files: U
     (interestedWing === 'Technical' && !technicalDivisions.includes(String(division))) ||
     (interestedWing === 'Non-Technical' && !nonTechnicalDivisions.includes(String(division)))
   ) {
-    throw new Error('Invalid wing or division');
+    throw new ApplicationValidationError('Invalid wing or division');
   }
 
   if (
     !hasFile(files, 'curriculumVitae') ||
     !isGoogleDocsOrDriveUrl(String(body.portfolioUrl ?? ''))
   ) {
-    throw new Error('CV and a valid portfolio link are required');
+    throw new ApplicationValidationError('CV and a valid portfolio link are required');
   }
 
   if (requiresTechnicalDocuments) {
     if (!hasFile(files, 'essay') || !hasFile(files, 'parentPermissionLetter')) {
-      throw new Error('Essay and parent permission letter files are required');
+      throw new ApplicationValidationError('Essay and parent permission letter files are required');
     }
     return;
   }
 
   if (!hasFile(files, 'motivationLetter') || !hasFile(files, 'parentPermissionLetter')) {
-    throw new Error('Motivation letter and parent permission letter files are required');
+    throw new ApplicationValidationError('Motivation letter and parent permission letter files are required');
   }
 
   if (division === 'Administration' || division === 'Branding') {
     if (!isGoogleDocsOrDriveUrl(String(body.specialTaskUrl ?? ''))) {
-      throw new Error('A valid special task link is required');
+      throw new ApplicationValidationError('A valid special task link is required');
     }
   }
 };
@@ -169,12 +172,11 @@ const findReferenceCodes = async (body: Record<string, unknown>) => {
     supabase.from('divisions').select('code').eq('name', divisionName).eq('interested_wing_code', interestedWingCode).maybeSingle(),
   ]);
 
-  // Error spesifik
-  if (!degree) throw new Error(`Degree level "${degreeLevelCode}" not found`);
-  if (!program) throw new Error(`Study program "${studyProgramCode}" not found`);
-  if (!batch) throw new Error(`Batch ${batchYear} is not open or invalid`);
-  if (!wing) throw new Error(`Wing "${interestedWingCode}" not found`);
-  if (!division) throw new Error(`Division "${divisionName}" not found for wing "${interestedWingCode}"`);
+  if (!degree) throw new ApplicationValidationError(`Degree level "${degreeLevelCode}" not found`);
+  if (!program) throw new ApplicationValidationError(`Study program "${studyProgramCode}" not found`);
+  if (!batch) throw new ApplicationValidationError(`Batch ${batchYear} is not open or invalid`);
+  if (!wing) throw new ApplicationValidationError(`Wing "${interestedWingCode}" not found`);
+  if (!division) throw new ApplicationValidationError(`Division "${divisionName}" not found for wing "${interestedWingCode}"`);
 
   return {
     degreeLevelCode: degree.code,
@@ -511,8 +513,12 @@ router.post(
       // SUPABASE ERROR
       // =====================================================
 
+      if (error?.code === '23505') {
+        throw new ApplicationValidationError('An application with this NRP already exists');
+      }
+
       if (error) {
-        throw error.message;
+        throw error;
       }
 
       // =====================================================
@@ -590,42 +596,8 @@ router.post(
       // CLIENT ERROR
       // =====================================================
 
-      if (
-        error instanceof Error &&
-        (
-          error.message.endsWith(
-            'is required',
-          ) ||
-          error.message.includes(
-            'required',
-          ) ||
-          error.message.startsWith(
-            'Invalid wing',
-          ) ||
-          error.message.startsWith(
-            'A valid',
-          ) ||
-          error.message.startsWith(
-            'Invalid reference',
-          ) ||
-          error.message.startsWith(
-            'Invalid applicationStep',
-          ) ||
-          error.message.startsWith(
-            'Invalid batch',
-          ) ||
-          error.message.startsWith(
-            'essay is not allowed',
-          ) ||
-          error.message.startsWith(
-            'motivationLetter is not allowed',
-          )
-        )
-      ) {
-        response.status(400).json({
-          error: error.message,
-        });
-
+      if (error instanceof ApplicationValidationError) {
+        response.status(400).json({ error: error.message });
         return;
       }
 
