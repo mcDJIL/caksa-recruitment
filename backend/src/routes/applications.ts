@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabase.js';
 import { appendApplicationToSheet } from '../lib/googleSheets.js';
 
 const router = express.Router();
-const MAX_FILE_SIZE = 30 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const allowedFileFields = new Set([
   'curriculumVitae',
   'essay',
@@ -532,7 +532,7 @@ router.post(
       });
 
       try {
-        await appendApplicationToSheet({
+        void appendApplicationToSheet({
           timestamp: new Date().toLocaleString("sv-SE", {
               timeZone: "Asia/Jakarta",
           }).replace(" ", "T"),
@@ -578,6 +578,11 @@ router.post(
           sheetError,
         );
       }
+
+      response.status(201).json({
+        applicationCode: code,
+        status: 'PENDING',
+      });
 
     } catch (error) {
       // =====================================================

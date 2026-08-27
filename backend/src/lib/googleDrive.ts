@@ -56,15 +56,11 @@ export const uploadFilesToDrive = async (
   applicationCode: string,
   files: Express.Multer.File[],
 ): Promise<DriveFileMetadata[]> => {
-  const uploaded: DriveFileMetadata[] = [];
-
-  for (const file of files) {
-    const folderId = folderIdForField(file.fieldname);
-
+  const uploads = files.map(async (file) => {
     const result = await drive.files.create({
       requestBody: {
         name: `${applicationCode} - ${file.originalname}`,
-        parents: [folderId],
+        parents: [folderIdForField(file.fieldname)],
       },
 
       media: {
@@ -83,21 +79,19 @@ export const uploadFilesToDrive = async (
       );
     }
 
-    uploaded.push({
+    return {
       fieldName: file.fieldname,
       driveFileId,
-
       url:
         result.data.webViewLink ??
         `https://drive.google.com/file/d/${driveFileId}/view`,
-
       originalName: file.originalname,
       mimeType: file.mimetype,
       size: file.size,
-    });
-  }
+    };
+  });
 
-  return uploaded;
+  return Promise.all(uploads);
 };
 
 export const deleteDriveFiles = async (
