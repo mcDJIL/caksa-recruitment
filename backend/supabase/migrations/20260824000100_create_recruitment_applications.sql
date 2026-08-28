@@ -62,7 +62,7 @@ create table public.interested_wings (
 -- ============================================================
 
 create table public.divisions (
-  code text primary key,
+  code text not null,
 
   name text not null,
 
@@ -71,7 +71,7 @@ create table public.divisions (
 
   sort_order smallint not null default 0,
 
-  unique (code, interested_wing_code),
+  primary key (code, interested_wing_code),
 
   unique (interested_wing_code, name)
 );
@@ -199,7 +199,8 @@ insert into public.interested_wings (
 )
 values
   ('technical', 'Technical', 1),
-  ('non-technical', 'Non-Technical', 2);
+  ('non-technical', 'Non-Technical', 2),
+  ('research-development', 'Research & Development', 3);
 
 
 -- ============================================================
@@ -232,12 +233,6 @@ values
     3
   ),
   (
-    'research-development',
-    'Research & Development',
-    'technical',
-    4
-  ),
-  (
     'administration',
     'Administration',
     'non-technical',
@@ -260,6 +255,24 @@ values
     'Project Management',
     'non-technical',
     4
+  ),
+  (
+    'electrical',
+    'Electrical',
+    'research-development',
+    1
+  ),
+  (
+    'mechanical',
+    'Mechanical',
+    'research-development',
+    2
+  ),
+  (
+    'programming',
+    'Programming',
+    'research-development',
+    3
   );
 
 

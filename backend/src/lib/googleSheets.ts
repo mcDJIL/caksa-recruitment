@@ -26,6 +26,7 @@ export type ApplicationSheetData = {
     batch: string;
     instagram: string;
     referralSource: string;
+    interestedWing: string;
     division: string;
 
     curriculumVitaeUrl: string;
@@ -63,27 +64,26 @@ export const appendApplicationToSheet = async (
                     data.batch,                        // G
                     data.instagram,                    // H
                     data.referralSource,               // I
-                    data.division,                     // J
-                    data.curriculumVitaeUrl,           // K
-                    data.essayOrMotivationLetterUrl,   // L
-                    data.parentPermissionLetterUrl,    // M
-                    data.portfolioUrl,                 // N
-                    data.specialTaskUrl,               // O
+                    data.interestedWing,                // J
+                    data.division,                      // K
+                    data.curriculumVitaeUrl,            // L
+                    data.essayOrMotivationLetterUrl,    // M
+                    data.parentPermissionLetterUrl,     // N
+                    data.portfolioUrl,                  // O
+                    data.specialTaskUrl,                // P
 
-                    '', // P - Ide
-                    '', // Q - Kerelevanan
-                    '', // R - Skill/Pengalaman/Prestasi
-                    '', // S - Nama, Alamat, Kontak
-                    '', // T - Portofolio
-                    '', // U - Special Task
-                    '', // V - Portofolio (Jika Ada)
-                    '', // W - Jumlah Poin
+                    '', // Q - Ide
+                    '', // R - Kerelevanan
+                    '', // S - Skill/Pengalaman/Prestasi
+                    '', // T - Nama, Alamat, Kontak
+                    '', // U - Portofolio
+                    '', // V - Additional Doc
+                    '', // W - Portofolio (Jika Ada)
+                    '', // X - Jumlah Poin
 
-                    data.status, // X - Status
+                    data.status, // Y - Status
 
-                    '', // Y - Noted
-
-                    '', // Z - kosong
+                    '', // Z - Noted
                 ],
             ],
         },

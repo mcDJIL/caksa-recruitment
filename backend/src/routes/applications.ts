@@ -123,14 +123,16 @@ const isGoogleDocsOrDriveUrl = (value: string): boolean => {
 const validateApplicationRequirements = (body: Record<string, unknown>, files: UploadedFile[]) => {
   const interestedWing = body.interestedWing;
   const division = body.division;
-  const technicalDivisions = ['Electrical', 'Mechanical', 'Programming', 'Research & Development'];
+  const technicalDivisions = ['Electrical', 'Mechanical', 'Programming'];
   const nonTechnicalDivisions = ['Administration', 'Branding', 'Public Relations', 'Project Management'];
-  const requiresTechnicalDocuments = interestedWing === 'Technical';
+  const requiresTechnicalDocuments = interestedWing === 'Technical' || interestedWing === 'Research & Development';
+  const validDivisions = interestedWing === 'Technical' || interestedWing === 'Research & Development'
+    ? technicalDivisions
+    : nonTechnicalDivisions;
 
   if (
-    (interestedWing !== 'Technical' && interestedWing !== 'Non-Technical') ||
-    (interestedWing === 'Technical' && !technicalDivisions.includes(String(division))) ||
-    (interestedWing === 'Non-Technical' && !nonTechnicalDivisions.includes(String(division)))
+    !['Technical', 'Research & Development', 'Non-Technical'].includes(String(interestedWing)) ||
+    !validDivisions.includes(String(division))
   ) {
     throw new ApplicationValidationError('Invalid wing or division');
   }
@@ -166,12 +168,15 @@ const findReferenceCodes = async (body: Record<string, unknown>) => {
   const degreeLevelCode = requiredString(body.degreeLevel, 'degreeLevel');
   const studyProgramCode = requiredString(body.studyProgram, 'studyProgram');
   const batchYear = Number(requiredString(body.batch, 'batch'));
-  const interestedWingCode = requiredString(body.interestedWing, 'interestedWing') === 'Technical'
+  const interestedWingName = requiredString(body.interestedWing, 'interestedWing');
+  const interestedWingCode = interestedWingName === 'Technical'
     ? 'technical'
-    : 'non-technical';
+    : interestedWingName === 'Research & Development'
+      ? 'research-development'
+      : 'non-technical';
   const divisionName = requiredString(body.division, 'division');
 
-  const [{ data: degree }, { data: program }, { data: batch }, { data: wing }, { data: division }] = await Promise.all([
+  const [{ data: degree, error: degreeError }, { data: program, error: programError }, { data: batch, error: batchError }, { data: wing, error: wingError }, { data: division, error: divisionError }] = await Promise.all([
     supabase.from('degree_levels').select('code, name').eq('code', degreeLevelCode).maybeSingle(),
     supabase.from('study_programs').select('code, name').eq('code', studyProgramCode).maybeSingle(),
     supabase.from('recruitment_batches').select('year').eq('year', batchYear).eq('is_open', true).maybeSingle(),
@@ -179,6 +184,11 @@ const findReferenceCodes = async (body: Record<string, unknown>) => {
     supabase.from('divisions').select('code').eq('name', divisionName).eq('interested_wing_code', interestedWingCode).maybeSingle(),
   ]);
 
+  if (degreeError) throw degreeError;
+  if (programError) throw programError;
+  if (batchError) throw batchError;
+  if (wingError) throw wingError;
+  if (divisionError) throw divisionError;
   if (!degree) throw new ApplicationValidationError(`Degree level "${degreeLevelCode}" not found`);
   if (!program) throw new ApplicationValidationError(`Study program "${studyProgramCode}" not found`);
   if (!batch) throw new ApplicationValidationError(`Batch ${batchYear} is not open or invalid`);
@@ -394,7 +404,7 @@ router.post(
         });
 
       if (error?.code === '23505') {
-        throw new ApplicationValidationError('An application with this NRP already exists');
+        throw new ApplicationValidationError('An application with this NRP or Email already exists');
       }
 
       if (error) {
@@ -407,53 +417,53 @@ router.post(
           'PENDING' satisfies ApplicationStatus,
       });
 
-      try {
-        void appendApplicationToSheet({
-          timestamp: new Date().toLocaleString("sv-SE", {
-              timeZone: "Asia/Jakarta",
-          }).replace(" ", "T"),
+      void appendApplicationToSheet({
+        timestamp: new Date().toLocaleString("sv-SE", {
+            timeZone: "Asia/Jakarta",
+        }).replace(" ", "T"),
 
-          email,
+        email,
 
-          fullName,
+        fullName,
 
-          nrp,
+        nrp,
 
-          degreeLevel: degreeLevel,
+        degreeLevel: degreeLevel,
 
-          studyProgram: references.studyProgramName,
+        studyProgram: references.studyProgramName,
 
-          batch: String(references.batchYear),
+        batch: String(references.batchYear),
 
-          instagram,
+        instagram,
 
-          referralSource,
+        referralSource,
 
-          division: division,
+        interestedWing,
 
-          curriculumVitaeUrl: curriculumVitaeUrl ?? '',
+        division,
 
-          essayOrMotivationLetterUrl:
-            essayUrl ??
-            motivationLetterUrl ??
-            '',
+        curriculumVitaeUrl: curriculumVitaeUrl ?? '',
 
-          parentPermissionLetterUrl:
-            parentPermissionLetterUrl ?? '',
+        essayOrMotivationLetterUrl:
+          essayUrl ??
+          motivationLetterUrl ??
+          '',
 
-          portfolioUrl: portfolioUrl ?? '',
+        parentPermissionLetterUrl:
+          parentPermissionLetterUrl ?? '',
 
-          specialTaskUrl:
-            specialTaskUrl ?? '',
+        portfolioUrl: portfolioUrl ?? '',
 
-          status: 'PENDING',
-        });
-      } catch (sheetError) {
+        specialTaskUrl:
+          specialTaskUrl ?? '',
+
+        status: 'PENDING',
+      }).catch((sheetError) => {
         console.error(
           'Failed to append application to Google Sheets:',
           sheetError,
         );
-      }
+      });
 
     } catch (error) {
       if (
@@ -527,7 +537,8 @@ router.get('/export', requireAdmin, async (request, response, next) => {
       'Batch',
       'Instagram',
       'Where do you know about this Open Recruitment?',
-      'Available Position (Divisions)',
+      'Interested Wing',
+      'Division',
       'Curriculum Vitae / Example CV Caksa',
       'Essay (Technical Division) /Motivation Letter (Non Technical Division) / Example MotLett',
       'Parent Permission Letter (Surat Izin Orang Tua) / Parent Permission Letter',
@@ -568,7 +579,8 @@ router.get('/export', requireAdmin, async (request, response, next) => {
         row.batch_year,
         row.instagram,
         row.referral_source,
-        `${interestedWingName} / ${divisionName}`,
+        interestedWingName,
+        divisionName,
         row.curriculum_vitae_url ?? '',
         essayOrMotivationUrl,
         row.parent_permission_letter_url ?? '',
@@ -671,7 +683,7 @@ router.get('/:nrp', trackingRateLimit, async (request, response, next) => {
     const nrp = normalizeNrp(request.params.nrp);
     const { data, error } = await supabase
       .from('recruitment_applications')
-      .select('nrp, status, updated_at')
+      .select('nrp, full_name, status, updated_at')
       .eq('nrp', nrp)
       .maybeSingle();
 
