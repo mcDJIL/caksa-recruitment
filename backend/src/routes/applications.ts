@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { randomBytes } from 'node:crypto';
+
 import ExcelJS from 'exceljs';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -65,7 +65,12 @@ const requiredString = (value: unknown, field: string): string => {
   return value.trim();
 };
 
-const applicationCode = (): string => `CAKSA-26-${Math.floor(Math.random() * 1000) + 1}`;
+const optionalString = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmedValue = value.trim();
+  return trimmedValue || null;
+};
+
 
 const trackingRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -130,11 +135,13 @@ const validateApplicationRequirements = (body: Record<string, unknown>, files: U
     throw new ApplicationValidationError('Invalid wing or division');
   }
 
-  if (
-    !hasFile(files, 'curriculumVitae') ||
-    !isGoogleDocsOrDriveUrl(String(body.portfolioUrl ?? ''))
-  ) {
-    throw new ApplicationValidationError('CV and a valid portfolio link are required');
+  if (!hasFile(files, 'curriculumVitae')) {
+    throw new ApplicationValidationError('CV is required');
+  }
+
+  const portfolioUrl = optionalString(body.portfolioUrl);
+  if (portfolioUrl && !isGoogleDocsOrDriveUrl(portfolioUrl)) {
+    throw new ApplicationValidationError('Portfolio link must be a valid Google Drive or Docs URL');
   }
 
   if (requiresTechnicalDocuments) {
@@ -193,14 +200,15 @@ router.post(
   upload.any(),
   async (request, response, next) => {
     const files = (request.files ?? []) as UploadedFile[];
-
     const uploadedDriveFileIds: string[] = [];
 
-    try {
-      // =====================================================
-      // BODY
-      // =====================================================
+    const totalFileSize = files.reduce((total, file) => total + file.size, 0);
+    if (totalFileSize > MAX_FILE_SIZE) {
+      response.status(413).json({ error: 'Total file size must not exceed 10 MB' });
+      return;
+    }
 
+    try {
       const body =
         request.body as Record<string, unknown>;
 
@@ -259,14 +267,7 @@ router.post(
         'studyProgram',
       );
 
-      const portfolioUrl = requiredString(
-        body.portfolioUrl,
-        'portfolioUrl',
-      );
-
-      // =====================================================
-      // BASIC VALIDATION
-      // =====================================================
+      const portfolioUrl = optionalString(body.portfolioUrl);
 
       if (!email.includes('@')) {
         response.status(400).json({
@@ -283,10 +284,6 @@ router.post(
 
         return;
       }
-
-      // =====================================================
-      // SPECIAL TASK URL
-      // =====================================================
 
       const requiresSpecialTask =
         interestedWing === 'Non-Technical' &&
@@ -333,185 +330,68 @@ router.post(
         return;
       }
 
-      // =====================================================
-      // APPLICATION REQUIREMENTS
-      // =====================================================
-
       validateApplicationRequirements(
         body,
         files,
       );
 
-      // =====================================================
-      // DATABASE REFERENCES
-      // =====================================================
-
-      const references =
-        await findReferenceCodes(body);
-
-      // =====================================================
-      // APPLICATION ID
-      // =====================================================
-
       const id = crypto.randomUUID();
 
-      const code = applicationCode();
+      const [referencesResult, driveResult] = await Promise.allSettled([
+        findReferenceCodes(body),
+        uploadFilesToDrive(nrp, files),
+      ]);
 
-      // =====================================================
-      // UPLOAD FILES TO GOOGLE DRIVE
-      // =====================================================
-
-      const fileMetadata =
-        await uploadFilesToDrive(
-          code,
-          files,
+      if (driveResult.status === 'fulfilled') {
+        uploadedDriveFileIds.push(
+          ...driveResult.value.map((file) => file.driveFileId),
         );
+      }
 
-      uploadedDriveFileIds.push(
-        ...fileMetadata.map(
-          (file) => file.driveFileId,
-        ),
-      );
+      if (referencesResult.status === 'rejected') {
+        throw referencesResult.reason;
+      }
 
-      // =====================================================
-      // GET FILE URL
-      // =====================================================
+      if (driveResult.status === 'rejected') {
+        throw driveResult.reason;
+      }
+
+      const references = referencesResult.value;
+      const fileMetadata = driveResult.value;
 
       const curriculumVitaeUrl =
-        fileMetadata.find(
-          (file) =>
-            file.fieldName ===
-            'curriculumVitae',
-        )?.url ?? null;
-
+        fileMetadata.find((f) => f.fieldName === 'curriculumVitae')?.url ?? null;
       const parentPermissionLetterUrl =
-        fileMetadata.find(
-          (file) =>
-            file.fieldName ===
-            'parentPermissionLetter',
-        )?.url ?? null;
-
-      const essayUrl =
-        fileMetadata.find(
-          (file) =>
-            file.fieldName === 'essay',
-        )?.url ?? null;
-
+        fileMetadata.find((f) => f.fieldName === 'parentPermissionLetter')?.url ?? null;
+      const essayUrl = fileMetadata.find((f) => f.fieldName === 'essay')?.url ?? null;
       const motivationLetterUrl =
-        fileMetadata.find(
-          (file) =>
-            file.fieldName ===
-            'motivationLetter',
-        )?.url ?? null;
-
-      // =====================================================
-      // INSERT SUPABASE
-      // =====================================================
+        fileMetadata.find((f) => f.fieldName === 'motivationLetter')?.url ?? null;
 
       const { error } = await supabase
         .from('recruitment_applications')
         .insert({
-          // -------------------------
-          // ID
-          // -------------------------
-
           id,
-
-          application_code: code,
-
-          // -------------------------
-          // RECRUITMENT
-          // -------------------------
-
-          recruitment_year:
-            Number(batch),
-
-          batch_year:
-            references.batchYear,
-
-          // -------------------------
-          // PERSONAL
-          // -------------------------
-
+          recruitment_year: Number(batch),
+          batch_year: references.batchYear,
           email,
-
-          full_name:
-            fullName,
-
+          full_name: fullName,
           nrp,
-
           instagram,
-
-          // -------------------------
-          // EDUCATION
-          // -------------------------
-
-          degree_level_code:
-            references.degreeLevelCode,
-
-          study_program_code:
-            references.studyProgramCode,
-
-          // -------------------------
-          // RECRUITMENT CHOICE
-          // -------------------------
-
-          interested_wing_code:
-            references.interestedWingCode,
-
-          division_code:
-            references.divisionCode,
-
-          // -------------------------
-          // OTHER
-          // -------------------------
-
-          referral_source:
-            referralSource,
-
-          why_caksa:
-            whyCaksa,
-
-          portfolio_url:
-            portfolioUrl,
-
-          special_task_url:
-            specialTaskUrl,
-
-          // -------------------------
-          // GOOGLE DRIVE FILES
-          // -------------------------
-
-          curriculum_vitae_url:
-            curriculumVitaeUrl,
-
-          essay_url:
-            essayUrl,
-
-          motivation_letter_url:
-            motivationLetterUrl,
-
-          parent_permission_letter_url:
-            parentPermissionLetterUrl,
-
-          // -------------------------
-          // STATUS
-          // -------------------------
-
-          status:
-            'PENDING',
-
-          // -------------------------
-          // FILE METADATA
-          // -------------------------
-
-          file_metadata:
-            fileMetadata,
+          degree_level_code: references.degreeLevelCode,
+          study_program_code: references.studyProgramCode,
+          interested_wing_code: references.interestedWingCode,
+          division_code: references.divisionCode,
+          referral_source: referralSource,
+          why_caksa: whyCaksa,
+          portfolio_url: portfolioUrl,
+          special_task_url: specialTaskUrl,
+          curriculum_vitae_url: curriculumVitaeUrl,
+          essay_url: essayUrl,
+          motivation_letter_url: motivationLetterUrl,
+          parent_permission_letter_url: parentPermissionLetterUrl,
+          status: 'PENDING',
+          file_metadata: fileMetadata,
         });
-
-      // =====================================================
-      // SUPABASE ERROR
-      // =====================================================
 
       if (error?.code === '23505') {
         throw new ApplicationValidationError('An application with this NRP already exists');
@@ -520,13 +400,9 @@ router.post(
       if (error) {
         throw error;
       }
-
-      // =====================================================
-      // SUCCESS
-      // =====================================================
-
+      
       response.status(201).json({
-        applicationCode: code,
+        nrp,
         status:
           'PENDING' satisfies ApplicationStatus,
       });
@@ -565,7 +441,7 @@ router.post(
           parentPermissionLetterUrl:
             parentPermissionLetterUrl ?? '',
 
-          portfolioUrl,
+          portfolioUrl: portfolioUrl ?? '',
 
           specialTaskUrl:
             specialTaskUrl ?? '',
@@ -579,16 +455,7 @@ router.post(
         );
       }
 
-      response.status(201).json({
-        applicationCode: code,
-        status: 'PENDING',
-      });
-
     } catch (error) {
-      // =====================================================
-      // ROLLBACK GOOGLE DRIVE
-      // =====================================================
-
       if (
         uploadedDriveFileIds.length > 0
       ) {
@@ -596,10 +463,6 @@ router.post(
           uploadedDriveFileIds,
         );
       }
-
-      // =====================================================
-      // CLIENT ERROR
-      // =====================================================
 
       if (error instanceof ApplicationValidationError) {
         response.status(400).json({ error: error.message });
@@ -625,7 +488,7 @@ router.get('/export', requireAdmin, async (request, response, next) => {
     if (query) {
       const ilike = `%${escapedForIlike(query)}%`;
       exportQuery = exportQuery.or(
-        `application_code.ilike.${ilike},full_name.ilike.${ilike},email.ilike.${ilike},nrp.ilike.${ilike},study_program_code.ilike.${ilike}`,
+        `nrp.ilike.${ilike},full_name.ilike.${ilike},email.ilike.${ilike},study_program_code.ilike.${ilike}`,
       );
     }
 
@@ -709,7 +572,7 @@ router.get('/export', requireAdmin, async (request, response, next) => {
         row.curriculum_vitae_url ?? '',
         essayOrMotivationUrl,
         row.parent_permission_letter_url ?? '',
-        row.portfolio_url,
+        row.portfolio_url ?? '',
         additionalDocumentUrls,
         '',
         '',
@@ -841,7 +704,7 @@ router.get('/', requireAdmin, async (request, response, next) => {
     if (query) {
       const ilike = `%${escapedForIlike(query)}%`;
       applicationsQuery = applicationsQuery.or(
-        `application_code.ilike.${ilike},full_name.ilike.${ilike},email.ilike.${ilike},nrp.ilike.${ilike},study_program_code.ilike.${ilike}`,
+        `nrp.ilike.${ilike},full_name.ilike.${ilike},email.ilike.${ilike},study_program_code.ilike.${ilike}`,
       );
     }
 

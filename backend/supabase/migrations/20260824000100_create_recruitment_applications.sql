@@ -275,8 +275,6 @@ create table public.recruitment_applications (
 
   id uuid primary key,
 
-  application_code text not null unique,
-
 
   -- ----------------------------------------------------------
   -- RECRUITMENT

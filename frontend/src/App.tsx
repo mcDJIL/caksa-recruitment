@@ -11,7 +11,6 @@ type ApplicationStatus =
 
 type RecruitmentApplication = {
   id: string;
-  application_code: string;
   full_name: string;
   email: string;
   nrp: string;
@@ -139,7 +138,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | ApplicationStatus>("ALL");
 
   // Update status
-  const [updatingCode, setUpdatingCode] = useState("");
+  const [updatingNrp, setUpdatingNrp] = useState("");
 
   // Detail modal
   const [selectedApplication, setSelectedApplication] = useState<RecruitmentApplication | null>(null);
@@ -248,38 +247,37 @@ function App() {
     }
   };
 
-  const handleStatusUpdate = async (applicationCode: string, status: ApplicationStatus) => {
+  const handleStatusUpdate = async (nrp: string, status: ApplicationStatus) => {
     if (!isAuthenticated) return;
-    setUpdatingCode(applicationCode);
+    setUpdatingNrp(nrp);
     setErrorMessage("");
     try {
-      const response = await fetch(`${API_BASE}/applications/${encodeURIComponent(applicationCode)}/status`, {
+      const response = await fetch(`${API_BASE}/applications/${encodeURIComponent(nrp)}/status`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      const result = (await response.json()) as { application_code?: string; status?: ApplicationStatus; error?: string };
-      if (!response.ok || !result.application_code || !result.status) {
+      const result = (await response.json()) as { nrp?: string; status?: ApplicationStatus; error?: string };
+      if (!response.ok || result.nrp !== nrp || !result.status) {
         throw new Error(result.error ?? "Failed to update status");
       }
       setApplications((previous) =>
         previous.map((item) =>
-          item.application_code === result.application_code
+          item.nrp === result.nrp
             ? { ...item, status: result.status ?? item.status, updated_at: new Date().toISOString() }
             : item,
         ),
       );
-      // Update selectedApplication if modal is open
       setSelectedApplication((prev) =>
-        prev && prev.application_code === result.application_code
+        prev && prev.nrp === result.nrp
           ? { ...prev, status: result.status ?? prev.status, updated_at: new Date().toISOString() }
           : prev,
       );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to update status");
     } finally {
-      setUpdatingCode("");
+      setUpdatingNrp("");
     }
   };
 
@@ -493,7 +491,7 @@ function App() {
             <table className="min-w-full divide-y divide-slate-700/50 text-left">
               <thead className="sticky top-0 z-10 bg-[#0f1513]/95 backdrop-blur">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold tracking-wide text-slate-400 uppercase">Code</th>
+                  <th className="px-4 py-3 text-xs font-semibold tracking-wide text-slate-400 uppercase">NRP</th>
                   <th className="px-4 py-3 text-xs font-semibold tracking-wide text-slate-400 uppercase">Applicant</th>
                   <th className="px-4 py-3 text-xs font-semibold tracking-wide text-slate-400 uppercase">Academic</th>
                   <th className="px-4 py-3 text-xs font-semibold tracking-wide text-slate-400 uppercase">Wing / Division</th>
@@ -509,7 +507,7 @@ function App() {
                     onClick={() => setSelectedApplication(application)}
                     className="cursor-pointer align-top transition hover:bg-lime-400/5"
                   >
-                    <td className="px-4 py-3 text-xs font-bold tracking-wide text-lime-200">{application.application_code}</td>
+                    <td className="px-4 py-3 text-xs font-bold tracking-wide text-lime-200">{application.nrp}</td>
                     <td className="px-4 py-3">
                       <p className="text-sm font-semibold text-slate-100">{application.full_name}</p>
                       <p className="text-xs text-slate-400">{application.email}</p>
@@ -534,10 +532,10 @@ function App() {
                         value={application.status}
                         onChange={(event) => {
                           event.stopPropagation();
-                          void handleStatusUpdate(application.application_code, event.target.value as ApplicationStatus);
+                          void handleStatusUpdate(application.nrp, event.target.value as ApplicationStatus);
                         }}
                         onClick={(event) => event.stopPropagation()}
-                        disabled={updatingCode === application.application_code}
+                        disabled={updatingNrp === application.nrp}
                         className="w-full rounded-lg border border-slate-700 bg-[#0b0f0e] px-2 py-2 text-xs text-slate-100 outline-none focus:border-lime-300 disabled:opacity-60"
                       >
                         {statusOptions.map((status) => (
@@ -546,7 +544,7 @@ function App() {
                           </option>
                         ))}
                       </select>
-                      {updatingCode === application.application_code && (
+                      {updatingNrp === application.nrp && (
                         <p className="mt-1 text-[11px] text-lime-200">Updating...</p>
                       )}
                     </td>
@@ -604,7 +602,7 @@ function App() {
               <div>
                 <p className="text-xs tracking-[0.2em] text-lime-300/80 uppercase">Applicant Detail</p>
                 <h2 className="mt-1 text-2xl font-bold text-white">{selectedApplication.full_name}</h2>
-                <p className="text-sm text-slate-400">{selectedApplication.application_code}</p>
+                <p className="text-sm text-slate-400">{selectedApplication.nrp}</p>
               </div>
               <button
                 onClick={() => setSelectedApplication(null)}
@@ -620,8 +618,8 @@ function App() {
                 <label className="text-sm font-semibold text-slate-300">Status:</label>
                 <select
                   value={selectedApplication.status}
-                  onChange={(e) => void handleStatusUpdate(selectedApplication.application_code, e.target.value as ApplicationStatus)}
-                  disabled={updatingCode === selectedApplication.application_code}
+                  onChange={(e) => void handleStatusUpdate(selectedApplication.nrp, e.target.value as ApplicationStatus)}
+                  disabled={updatingNrp === selectedApplication.nrp}
                   className="rounded-lg border border-slate-700 bg-[#0b0f0e] px-3 py-2 text-sm text-slate-100 outline-none focus:border-lime-300"
                 >
                   {statusOptions.map((status) => (
@@ -630,7 +628,7 @@ function App() {
                     </option>
                   ))}
                 </select>
-                {updatingCode === selectedApplication.application_code && (
+                {updatingNrp === selectedApplication.nrp && (
                   <span className="text-xs text-lime-300">Updating...</span>
                 )}
               </div>

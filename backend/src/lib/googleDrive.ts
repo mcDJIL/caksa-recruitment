@@ -53,13 +53,13 @@ const folderIdForField = (fieldName: string): string => {
 };
 
 export const uploadFilesToDrive = async (
-  applicationCode: string,
+  nrp: string,
   files: Express.Multer.File[],
 ): Promise<DriveFileMetadata[]> => {
   const uploads = files.map(async (file) => {
     const result = await drive.files.create({
       requestBody: {
-        name: `${applicationCode} - ${file.originalname}`,
+        name: `${nrp} - ${file.originalname}`,
         parents: [folderIdForField(file.fieldname)],
       },
 

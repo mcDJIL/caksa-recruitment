@@ -43,6 +43,10 @@ app.use((_request, response) => {
 
 app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
   console.error(error);
+  if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+    response.status(413).json({ error: 'All file size must not exceed 10 MB' });
+    return;
+  }
   if (error instanceof multer.MulterError || (error instanceof Error && error.message === 'Unexpected field')) {
     response.status(400).json({ error: 'Invalid upload or file limit exceeded' });
     return;
