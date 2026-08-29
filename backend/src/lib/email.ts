@@ -24,7 +24,7 @@ export async function sendWelcomeEmail(to: string, name: string, nrp: string, wa
   );
 
   await resend.emails.send({
-    from: "CAKSA Team <caksaeepis@gmail.com>",
+    from: "CAKSA Team <onboarding@resend.dev>",
     to,
     subject: "Pendaftaran Berhasil - CAKSA Recruitment 2026",
     html,
