@@ -49,5 +49,12 @@ export const config = {
   },
   googleSheetsSpreadsheetId: requiredEnvironment('GOOGLE_SHEETS_SPREADSHEET_ID'),
   googleSheetsSheetName: requiredEnvironment('GOOGLE_SHEETS_SHEET_NAME'),
+  whatsappGroupLink: requiredEnvironment('WHATSAPP_GROUP_LINK'),
+  smtpHost: requiredEnvironment('SMTP_HOST'),
+  smtpPort: requiredEnvironment('SMTP_PORT'),
+  smtpUser: requiredEnvironment('SMTP_USER'),
+  smtpPassword: requiredEnvironment('SMTP_PASSWORD'),
+  smtpFrom: requiredEnvironment('SMTP_FROM'),
+  resendApiKey: requiredEnvironment('RESEND_API_KEY'),
   adminApiToken,
 };

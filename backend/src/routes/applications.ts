@@ -8,6 +8,8 @@ import { requireAdmin } from '../lib/adminSession.js';
 import { deleteDriveFiles, uploadFilesToDrive } from '../lib/googleDrive.js';
 import { supabase } from '../lib/supabase.js';
 import { appendApplicationToSheet } from '../lib/googleSheets.js';
+import { sendWelcomeEmail } from '../lib/email.js';
+import { config } from '../config.js';
 
 const router = express.Router();
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -464,6 +466,10 @@ router.post(
           sheetError,
         );
       });
+
+      sendWelcomeEmail(email, fullName, nrp, config.whatsappGroupLink).catch(err => 
+        console.error("Gagal kirim email:", err)
+      );
 
     } catch (error) {
       if (
