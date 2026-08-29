@@ -467,7 +467,7 @@ router.post(
         );
       });
 
-      sendWelcomeEmail(email, fullName, nrp, config.whatsappGroupLink).catch(err => 
+      sendWelcomeEmail(email, fullName, nrp).catch(err => 
         console.error("Gagal kirim email:", err)
       );
 
