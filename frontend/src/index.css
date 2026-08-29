@@ -2,22 +2,14 @@
 
 :root {
   font-family: "Manrope", "Segoe UI", sans-serif;
+  color: #1a2940;
+  background: #f7f4ed;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(38, 99, 235, 0.28), transparent 44%),
-    radial-gradient(circle at 84% 2%, rgba(13, 148, 136, 0.24), transparent 34%),
-    linear-gradient(165deg, #05121f 0%, #09182c 55%, #102943 100%);
-  color: #e7effa;
-}
-
-#root {
-  min-height: 100vh;
-}
+html { background: #f7f4ed; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+#root { min-height: 100vh; }
