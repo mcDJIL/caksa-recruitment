@@ -124,7 +124,7 @@ const validateApplicationRequirements = (body: Record<string, unknown>, files: U
   const interestedWing = body.interestedWing;
   const division = body.division;
   const technicalDivisions = ['Electrical', 'Mechanical', 'Programming'];
-  const nonTechnicalDivisions = ['Administration', 'Branding', 'Public Relations', 'Project Management'];
+  const nonTechnicalDivisions = ['Internal', 'Branding', 'Public Relations', 'Project Management'];
   const requiresTechnicalDocuments = interestedWing === 'Technical' || interestedWing === 'Research & Development';
   const validDivisions = interestedWing === 'Technical' || interestedWing === 'Research & Development'
     ? technicalDivisions

@@ -233,8 +233,8 @@ values
     3
   ),
   (
-    'administration',
-    'Administration',
+    'internal',
+    'Internal',
     'non-technical',
     1
   ),
@@ -360,7 +360,7 @@ create table public.recruitment_applications (
   portfolio_url text,
 
   -- Required only for Non-Technical
-  -- Administration / Branding.
+  -- Internal / Branding.
   special_task_url text,
 
 
