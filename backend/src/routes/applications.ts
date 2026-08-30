@@ -509,7 +509,7 @@ router.get('/export', requireAdmin, async (request, response, next) => {
     }
 
     if (status) {
-      exportQuery = exportQuery.eq('status', status);
+      exportQuery = exportQuery.or(`status.eq.${status},draft_status.eq.${status}`);
     }
 
     const { data, error } = await exportQuery;
@@ -600,7 +600,7 @@ router.get('/export', requireAdmin, async (request, response, next) => {
         '',
         '',
         '',
-        row.status,
+        row.draft_status ?? row.status,
         '',
       ].map(safeSpreadsheetValue);
     });
@@ -727,7 +727,7 @@ router.get('/', requireAdmin, async (request, response, next) => {
     }
 
     if (status) {
-      applicationsQuery = applicationsQuery.eq('status', status);
+      applicationsQuery = applicationsQuery.or(`status.eq.${status},draft_status.eq.${status}`);
     }
 
     const { data, error, count } = await applicationsQuery;
@@ -761,9 +761,9 @@ router.patch('/:nrp/status', requireAdmin, async (request, response, next) => {
 
     const { data, error } = await supabase
       .from('recruitment_applications')
-      .update({ status })
+      .update({ draft_status: status })
       .eq('nrp', normalizeNrp(request.params.nrp))
-      .select('nrp, status, updated_at')
+      .select('nrp, status, draft_status, updated_at')
       .maybeSingle();
 
     if (error) throw error;
@@ -772,6 +772,16 @@ router.patch('/:nrp/status', requireAdmin, async (request, response, next) => {
       return;
     }
     response.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/publish-statuses', requireAdmin, async (_request, response, next) => {
+  try {
+    const { data, error } = await supabase.rpc('publish_application_statuses');
+    if (error) throw error;
+    response.json({ published: data ?? 0 });
   } catch (error) {
     next(error);
   }

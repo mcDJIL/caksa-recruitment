@@ -30,6 +30,7 @@ type RecruitmentApplication = {
   division_code: string;
   interested_wing_code: string;
   status: ApplicationStatus;
+  draft_status: ApplicationStatus | null;
   file_metadata?: ApplicantDocument[];
   created_at: string;
   updated_at: string;
@@ -126,6 +127,8 @@ function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [noticeMessage, setNoticeMessage] = useState("");
   const [applications, setApplications] = useState<RecruitmentApplication[]>([]);
   const [pagination, setPagination] = useState<PaginationData>({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [errorMessage, setErrorMessage] = useState("");
@@ -240,6 +243,7 @@ function App() {
     if (!isAuthenticated) return;
     setUpdatingNrp(nrp);
     setErrorMessage("");
+    setNoticeMessage("");
     try {
       const response = await fetch(`${API_BASE}/applications/${encodeURIComponent(nrp)}/status`, {
         method: "PATCH",
@@ -247,19 +251,39 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      const result = (await response.json()) as { nrp?: string; status?: ApplicationStatus; error?: string };
-      if (!response.ok || result.nrp !== nrp || !result.status) throw new Error(result.error ?? "Gagal memperbarui status");
-      setApplications((items) => items.map((item) => item.nrp === nrp ? { ...item, status: result.status!, updated_at: new Date().toISOString() } : item));
-      setSelectedApplication((item) => item && item.nrp === nrp ? { ...item, status: result.status!, updated_at: new Date().toISOString() } : item);
+      const result = (await response.json()) as { nrp?: string; draft_status?: ApplicationStatus; error?: string };
+      if (!response.ok || result.nrp !== nrp || !result.draft_status) throw new Error(result.error ?? "Gagal menyimpan keputusan");
+      setApplications((items) => items.map((item) => item.nrp === nrp ? { ...item, draft_status: result.draft_status!, updated_at: new Date().toISOString() } : item));
+      setSelectedApplication((item) => item && item.nrp === nrp ? { ...item, draft_status: result.draft_status!, updated_at: new Date().toISOString() } : item);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal memperbarui status");
+      setErrorMessage(error instanceof Error ? error.message : "Gagal menyimpan keputusan");
     } finally {
       setUpdatingNrp("");
     }
   };
 
+  const handlePublishStatuses = async () => {
+    if (!isAuthenticated || !window.confirm("Terbitkan seluruh keputusan yang sudah disiapkan? Status peserta akan diperbarui sekaligus dan tidak dapat dibatalkan dari sini.")) return;
+    setIsPublishing(true);
+    setErrorMessage("");
+    setNoticeMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/applications/publish-statuses`, { method: "POST", credentials: "include" });
+      const result = (await response.json()) as { published?: number; error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Gagal menerbitkan keputusan");
+      setNoticeMessage(`${result.published ?? 0} keputusan berhasil diterbitkan serentak.`);
+      await loadApplications(pagination.page);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Gagal menerbitkan keputusan");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const activeStatus = (application: RecruitmentApplication): ApplicationStatus => application.draft_status ?? application.status;
+
   const statusCount = useMemo(() => applications.reduce<Record<ApplicationStatus, number>>((count, item) => {
-    count[item.status] += 1;
+    count[activeStatus(item)] += 1;
     return count;
   }, { PENDING: 0, ADMINISTRATION: 0, INTERVIEW: 0, MEMBER: 0, NOT_SELECTED_ADMINISTRATION: 0, NOT_SELECTED_INTERVIEW: 0 }), [applications]);
 
@@ -307,7 +331,7 @@ function App() {
       <div className="dashboard-shell">
         <section className="page-heading">
           <div><p className="eyebrow">Candidate overview</p><h1>Ruang seleksi.</h1><p>Kelola perjalanan kandidat CAKSA dari satu panel yang ringkas dan terarah.</p></div>
-          <div className="heading-actions"><button className="secondary-button" type="button" onClick={() => void loadApplications(pagination.page)} disabled={isRefreshing}>{isRefreshing ? "Memuat…" : "Muat ulang"}</button><button className="primary-button compact" type="button" onClick={() => void handleExport()} disabled={isExporting || isRefreshing}>{isExporting ? "Mengekspor…" : "Export .xlsx"}<span aria-hidden="true">↓</span></button></div>
+          <div className="heading-actions"><button className="secondary-button" type="button" onClick={() => void loadApplications(pagination.page)} disabled={isRefreshing || isPublishing}>{isRefreshing ? "Memuat…" : "Muat ulang"}</button><button className="publish-button" type="button" onClick={() => void handlePublishStatuses()} disabled={isPublishing || isRefreshing}>{isPublishing ? "Menerbitkan…" : "Terbitkan keputusan"}</button><button className="primary-button compact" type="button" onClick={() => void handleExport()} disabled={isExporting || isRefreshing || isPublishing}>{isExporting ? "Mengekspor…" : "Export .xlsx"}<span aria-hidden="true">↓</span></button></div>
         </section>
 
         <section className="metrics" aria-label="Ringkasan pendaftar">
@@ -325,15 +349,16 @@ function App() {
             </div>
           </div>
           {errorMessage && <p className="alert panel-alert" role="alert">{errorMessage}</p>}
+          {noticeMessage && <p className="notice panel-alert" role="status">{noticeMessage}</p>}
           <div className="table-wrap"><table><thead><tr><th>NRP</th><th>Kandidat</th><th>Akademik</th><th>Wing / divisi</th><th>Dokumen</th><th>Status</th><th>Didaftarkan</th></tr></thead><tbody>
-            {applications.map((application) => <tr key={application.id} onClick={() => setSelectedApplication(application)}><td className="nrp">{application.nrp}</td><td><strong>{application.full_name}</strong><span>{application.email}</span></td><td><strong>{application.degree_level_code}</strong><span>{application.study_program_code} · {application.batch_year}</span></td><td><strong>{application.interested_wing_code}</strong><span>{application.division_code}</span></td><td><span className="file-count">{application.file_metadata?.length ?? 0} berkas</span></td><td><select className={`status-select ${statusTone[application.status]}`} value={application.status} onChange={(event) => { event.stopPropagation(); void handleStatusUpdate(application.nrp, event.target.value as ApplicationStatus); }} onClick={(event) => event.stopPropagation()} disabled={updatingNrp === application.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select>{updatingNrp === application.nrp && <small>Memperbarui…</small>}</td><td className="date-cell">{new Date(application.created_at).toLocaleString("id-ID")}</td></tr>)}
+            {applications.map((application) => <tr key={application.id} onClick={() => setSelectedApplication(application)}><td className="nrp">{application.nrp}</td><td><strong>{application.full_name}</strong><span>{application.email}</span></td><td><strong>{application.degree_level_code}</strong><span>{application.study_program_code} · {application.batch_year}</span></td><td><strong>{application.interested_wing_code}</strong><span>{application.division_code}</span></td><td><span className="file-count">{application.file_metadata?.length ?? 0} berkas</span></td><td><select className={`status-select ${statusTone[activeStatus(application)]}`} value={activeStatus(application)} onChange={(event) => { event.stopPropagation(); void handleStatusUpdate(application.nrp, event.target.value as ApplicationStatus); }} onClick={(event) => event.stopPropagation()} disabled={updatingNrp === application.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select>{application.draft_status && <small className="draft-label">Draft · belum diumumkan</small>}{updatingNrp === application.nrp && <small>Memperbarui…</small>}</td><td className="date-cell">{new Date(application.created_at).toLocaleString("id-ID")}</td></tr>)}
           </tbody></table></div>
           {applications.length === 0 && <p className="empty-state">Belum ada pendaftar yang cocok dengan filter ini.</p>}
           <footer className="panel-footer"><p>Menampilkan <b>{applications.length}</b> dari <b>{pagination.total}</b> kandidat</p><div className="pagination"><button type="button" disabled={pagination.page <= 1 || isRefreshing} onClick={() => setPagination((item) => ({ ...item, page: item.page - 1 }))}>Sebelumnya</button><span>{pagination.page} / {pagination.totalPages}</span><button type="button" disabled={pagination.page >= pagination.totalPages || isRefreshing} onClick={() => setPagination((item) => ({ ...item, page: item.page + 1 }))}>Berikutnya</button></div></footer>
         </section>
       </div>
 
-      {selectedApplication && <div className="modal-backdrop" onClick={() => setSelectedApplication(null)}><aside className="detail-panel" onClick={(event) => event.stopPropagation()} aria-modal="true" role="dialog" aria-labelledby="detail-name"><header><div><p className="eyebrow">Candidate file</p><h2 id="detail-name">{selectedApplication.full_name}</h2><span className="detail-nrp">{selectedApplication.nrp}</span></div><button type="button" className="close-button" onClick={() => setSelectedApplication(null)} aria-label="Tutup detail">×</button></header><div className="detail-content"><section className="detail-status"><label htmlFor="detail-status">Status seleksi</label><select id="detail-status" className={`status-select ${statusTone[selectedApplication.status]}`} value={selectedApplication.status} onChange={(event) => void handleStatusUpdate(selectedApplication.nrp, event.target.value as ApplicationStatus)} disabled={updatingNrp === selectedApplication.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select></section><div className="detail-grid"><section><h3>Kontak</h3><p>{selectedApplication.email}</p><p>NRP · {selectedApplication.nrp}</p></section><section><h3>Akademik</h3><p>{selectedApplication.degree_level_code}</p><p>{selectedApplication.study_program_code} · {selectedApplication.batch_year}</p></section><section><h3>Penempatan</h3><p>Wing · {selectedApplication.interested_wing_code}</p><p>Divisi · {selectedApplication.division_code}</p></section><section><h3>Waktu</h3><p>Masuk · {new Date(selectedApplication.created_at).toLocaleString("id-ID")}</p><p>Update · {new Date(selectedApplication.updated_at).toLocaleString("id-ID")}</p></section></div><section className="document-list"><h3>Dokumen <span>{selectedApplication.file_metadata?.length ?? 0}</span></h3>{(selectedApplication.file_metadata ?? []).length === 0 && <p className="no-documents">Tidak ada dokumen yang dilampirkan.</p>}{(selectedApplication.file_metadata ?? []).map((file) => <article key={`${file.fieldName}-${file.originalName}`}><div><strong>{file.fieldName}</strong>{file.url ? <a href={file.url} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}</div><small>{file.mimeType} · {readableFileSize(file.size)}</small></article>)}</section></div></aside></div>}
+      {selectedApplication && <div className="modal-backdrop" onClick={() => setSelectedApplication(null)}><aside className="detail-panel" onClick={(event) => event.stopPropagation()} aria-modal="true" role="dialog" aria-labelledby="detail-name"><header><div><p className="eyebrow">Candidate file</p><h2 id="detail-name">{selectedApplication.full_name}</h2><span className="detail-nrp">{selectedApplication.nrp}</span></div><button type="button" className="close-button" onClick={() => setSelectedApplication(null)} aria-label="Tutup detail">×</button></header><div className="detail-content"><section className="detail-status"><label htmlFor="detail-status">Keputusan seleksi</label><select id="detail-status" className={`status-select ${statusTone[activeStatus(selectedApplication)]}`} value={activeStatus(selectedApplication)} onChange={(event) => void handleStatusUpdate(selectedApplication.nrp, event.target.value as ApplicationStatus)} disabled={updatingNrp === selectedApplication.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select>{selectedApplication.draft_status && <p className="draft-label">Tersimpan sebagai draft dan belum terlihat oleh peserta.</p>}</section><div className="detail-grid"><section><h3>Kontak</h3><p>{selectedApplication.email}</p><p>NRP · {selectedApplication.nrp}</p></section><section><h3>Akademik</h3><p>{selectedApplication.degree_level_code}</p><p>{selectedApplication.study_program_code} · {selectedApplication.batch_year}</p></section><section><h3>Penempatan</h3><p>Wing · {selectedApplication.interested_wing_code}</p><p>Divisi · {selectedApplication.division_code}</p></section><section><h3>Waktu</h3><p>Masuk · {new Date(selectedApplication.created_at).toLocaleString("id-ID")}</p><p>Update · {new Date(selectedApplication.updated_at).toLocaleString("id-ID")}</p></section></div><section className="document-list"><h3>Dokumen <span>{selectedApplication.file_metadata?.length ?? 0}</span></h3>{(selectedApplication.file_metadata ?? []).length === 0 && <p className="no-documents">Tidak ada dokumen yang dilampirkan.</p>}{(selectedApplication.file_metadata ?? []).map((file) => <article key={`${file.fieldName}-${file.originalName}`}><div><strong>{file.fieldName}</strong>{file.url ? <a href={file.url} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}</div><small>{file.mimeType} · {readableFileSize(file.size)}</small></article>)}</section></div></aside></div>}
     </main>
   );
 }
