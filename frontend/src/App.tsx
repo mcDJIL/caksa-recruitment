@@ -32,6 +32,7 @@ type RecruitmentApplication = {
   status: ApplicationStatus;
   draft_status: ApplicationStatus | null;
   file_metadata?: ApplicantDocument[];
+  portfolio_url?: string;
   created_at: string;
   updated_at: string;
 };
@@ -358,7 +359,53 @@ function App() {
         </section>
       </div>
 
-      {selectedApplication && <div className="modal-backdrop" onClick={() => setSelectedApplication(null)}><aside className="detail-panel" onClick={(event) => event.stopPropagation()} aria-modal="true" role="dialog" aria-labelledby="detail-name"><header><div><p className="eyebrow">Candidate file</p><h2 id="detail-name">{selectedApplication.full_name}</h2><span className="detail-nrp">{selectedApplication.nrp}</span></div><button type="button" className="close-button" onClick={() => setSelectedApplication(null)} aria-label="Tutup detail">×</button></header><div className="detail-content"><section className="detail-status"><label htmlFor="detail-status">Keputusan seleksi</label><select id="detail-status" className={`status-select ${statusTone[activeStatus(selectedApplication)]}`} value={activeStatus(selectedApplication)} onChange={(event) => void handleStatusUpdate(selectedApplication.nrp, event.target.value as ApplicationStatus)} disabled={updatingNrp === selectedApplication.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select>{selectedApplication.draft_status && <p className="draft-label">Tersimpan sebagai draft dan belum terlihat oleh peserta.</p>}</section><div className="detail-grid"><section><h3>Kontak</h3><p>{selectedApplication.email}</p><p>NRP · {selectedApplication.nrp}</p></section><section><h3>Akademik</h3><p>{selectedApplication.degree_level_code}</p><p>{selectedApplication.study_program_code} · {selectedApplication.batch_year}</p></section><section><h3>Penempatan</h3><p>Wing · {selectedApplication.interested_wing_code}</p><p>Divisi · {selectedApplication.division_code}</p></section><section><h3>Waktu</h3><p>Masuk · {new Date(selectedApplication.created_at).toLocaleString("id-ID")}</p><p>Update · {new Date(selectedApplication.updated_at).toLocaleString("id-ID")}</p></section></div><section className="document-list"><h3>Dokumen <span>{selectedApplication.file_metadata?.length ?? 0}</span></h3>{(selectedApplication.file_metadata ?? []).length === 0 && <p className="no-documents">Tidak ada dokumen yang dilampirkan.</p>}{(selectedApplication.file_metadata ?? []).map((file) => <article key={`${file.fieldName}-${file.originalName}`}><div><strong>{file.fieldName}</strong>{file.url ? <a href={file.url} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}</div><small>{file.mimeType} · {readableFileSize(file.size)}</small></article>)}</section></div></aside></div>}
+      {selectedApplication && 
+        <div className="modal-backdrop" onClick={() => setSelectedApplication(null)}>
+          <aside className="detail-panel" onClick={(event) => event.stopPropagation()} aria-modal="true" role="dialog" aria-labelledby="detail-name">
+            <header>
+              <div>
+                <p className="eyebrow">Candidate file</p>
+                <h2 id="detail-name">{selectedApplication.full_name}</h2>
+                <span className="detail-nrp">{selectedApplication.nrp}</span>
+              </div>
+              <button type="button" className="close-button" onClick={() => setSelectedApplication(null)} aria-label="Tutup detail">×</button>
+            </header>
+            <div className="detail-content">
+              <section className="detail-status">
+                <label htmlFor="detail-status">Keputusan seleksi</label>
+                <select id="detail-status" className={`status-select ${statusTone[activeStatus(selectedApplication)]}`} value={activeStatus(selectedApplication)} onChange={(event) => void handleStatusUpdate(selectedApplication.nrp, event.target.value as ApplicationStatus)} disabled={updatingNrp === selectedApplication.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}
+                </select>{selectedApplication.draft_status && <p className="draft-label">Tersimpan sebagai draft dan belum terlihat oleh peserta.</p>}
+              </section>
+            <div className="detail-grid">
+              <section>
+                <h3>Kontak</h3>
+                <p>{selectedApplication.email}</p>
+                <p>NRP · {selectedApplication.nrp}</p>
+              </section>
+              <section>
+                <h3>Akademik</h3>
+                <p>{selectedApplication.degree_level_code}</p>
+                <p>{selectedApplication.study_program_code} · {selectedApplication.batch_year}</p>
+              </section>
+              <section>
+                <h3>Penempatan</h3>
+                <p>Divisi · {selectedApplication.interested_wing_code}</p>
+                <p>Subivisi · {selectedApplication.division_code}</p></section><section><h3>Waktu</h3>
+                <p>Masuk · {new Date(selectedApplication.created_at).toLocaleString("id-ID")}</p>
+                <p>Update · {new Date(selectedApplication.updated_at).toLocaleString("id-ID")}</p>
+              </section>
+            </div>
+            <section className="document-list">
+              <h3>Dokumen <span>{selectedApplication.file_metadata?.length ?? 0}</span>
+              </h3>{(selectedApplication.file_metadata ?? []).length === 0 && <p className="no-documents">Tidak ada dokumen yang dilampirkan.</p>}{(selectedApplication.file_metadata ?? []).map((file) => <article key={`${file.fieldName}-${file.originalName}`}><div><strong>{file.fieldName}</strong>{file.url ? <a href={file.url} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}</div><small>{file.mimeType} · {readableFileSize(file.size)}</small></article>)}
+            </section>
+            <section className="document-list">
+              <h3>Link Portfolio</h3>
+              <p>{selectedApplication.portfolio_url}</p>
+            </section>
+          </div>
+        </aside>
+      </div>}
     </main>
   );
 }

@@ -26,7 +26,7 @@ const secureEquals = (left: string, right: string): boolean => {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 };
 
-router.get('/google', requireAdmin, (_req, res) => {
+router.get('/google', (_req, res) => {
   const state = randomBytes(32).toString('base64url');
   res.cookie(stateCookieName, state, { ...stateCookieOptions, maxAge: 10 * 60 * 1000 });
   res.redirect(generateGoogleAuthUrl(state));
