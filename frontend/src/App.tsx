@@ -401,7 +401,7 @@ function App() {
             </section>
             <section className="document-list">
               <h3>Link Portfolio</h3>
-              <p>{selectedApplication.portfolio_url}</p>
+              <a href={selectedApplication.portfolio_url} className="text-sm">{selectedApplication.portfolio_url}</a>
             </section>
           </div>
         </aside>
