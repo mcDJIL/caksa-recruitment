@@ -159,7 +159,7 @@ const validateApplicationRequirements = (body: Record<string, unknown>, files: U
     throw new ApplicationValidationError('Motivation letter and parent permission letter files are required');
   }
 
-  if (division === 'Administration' || division === 'Branding') {
+  if (division === 'Internal' || division === 'Branding') {
     if (!isGoogleDocsOrDriveUrl(String(body.specialTaskUrl ?? ''))) {
       throw new ApplicationValidationError('A valid special task link is required');
     }
@@ -300,7 +300,7 @@ router.post(
       const requiresSpecialTask =
         interestedWing === 'Non-Technical' &&
         (
-          division === 'Administration' ||
+          division === 'Internal' ||
           division === 'Branding'
         );
 
@@ -549,7 +549,7 @@ router.get('/export', requireAdmin, async (request, response, next) => {
       'Essay (Technical Division) /Motivation Letter (Non Technical Division) / Example MotLett',
       'Parent Permission Letter (Surat Izin Orang Tua) / Parent Permission Letter',
       'Google Drive Link Portfolio (Make sure to set the access into viewer)',
-      'Special Task Branding and Administration Division Only (Make sure to set the access into viewer)',
+      'Special Task Branding and Internal Division Only (Make sure to set the access into viewer)',
       'Ide (40 poin)',
       'Kerelevanan (20 poin)',
       'Skill Pengalaman, Prestasi yang relevan (20 poin)',
