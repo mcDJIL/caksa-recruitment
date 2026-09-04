@@ -33,6 +33,7 @@ type RecruitmentApplication = {
   draft_status: ApplicationStatus | null;
   file_metadata?: ApplicantDocument[];
   portfolio_url?: string;
+  special_task_url?: string;
   created_at: string;
   updated_at: string;
 };
@@ -48,6 +49,33 @@ type ApplicationListResponse = {
   applications?: RecruitmentApplication[];
   pagination?: PaginationData;
   error?: string;
+};
+
+type DivisionFilter = "ALL" | "technical" | "research-development" | "non-technical";
+
+const divisionOptions: { value: DivisionFilter; label: string }[] = [
+  { value: "technical", label: "Technical" },
+  { value: "research-development", label: "Research & Development" },
+  { value: "non-technical", label: "Non-Technical" },
+];
+
+const subDivisionOptions: Record<Exclude<DivisionFilter, "ALL">, { value: string; label: string }[]> = {
+  technical: [
+    { value: "electrical", label: "Electrical" },
+    { value: "mechanical", label: "Mechanical" },
+    { value: "programming", label: "Programming" },
+  ],
+  "research-development": [
+    { value: "electrical", label: "Electrical" },
+    { value: "mechanical", label: "Mechanical" },
+    { value: "programming", label: "Programming" },
+  ],
+  "non-technical": [
+    { value: "branding", label: "Branding" },
+    { value: "project-management", label: "Project Management" },
+    { value: "public-relations", label: "Public Relations" },
+    { value: "internal", label: "Internal" },
+  ],
 };
 
 const API_BASE = (import.meta.env.VITE_RECRUITMENT_API_URL ?? "http://localhost:3000/api").replace(/\/$/, "");
@@ -79,19 +107,23 @@ const statusTone: Record<ApplicationStatus, string> = {
   NOT_SELECTED_INTERVIEW: "not-selected",
 };
 
-const buildApplicationsUrl = (page: number, limit: number, query: string, statusFilter: "ALL" | ApplicationStatus) => {
+const buildApplicationsUrl = (page: number, limit: number, query: string, statusFilter: "ALL" | ApplicationStatus, divisionFilter: DivisionFilter, subDivisionFilter: string) => {
   const url = new URL(`${API_BASE}/applications`);
   url.searchParams.set("page", String(page));
   url.searchParams.set("limit", String(limit));
   if (query.trim()) url.searchParams.set("q", query.trim());
   if (statusFilter !== "ALL") url.searchParams.set("status", statusFilter);
+  if (divisionFilter !== "ALL") url.searchParams.set("wing", divisionFilter);
+  if (subDivisionFilter !== "ALL") url.searchParams.set("division", subDivisionFilter);
   return url.toString();
 };
 
-const buildExportUrl = (query: string, statusFilter: "ALL" | ApplicationStatus) => {
+const buildExportUrl = (query: string, statusFilter: "ALL" | ApplicationStatus, divisionFilter: DivisionFilter, subDivisionFilter: string) => {
   const url = new URL(`${API_BASE}/applications/export`);
   if (query.trim()) url.searchParams.set("q", query.trim());
   if (statusFilter !== "ALL") url.searchParams.set("status", statusFilter);
+  if (divisionFilter !== "ALL") url.searchParams.set("wing", divisionFilter);
+  if (subDivisionFilter !== "ALL") url.searchParams.set("division", subDivisionFilter);
   return url.toString();
 };
 
@@ -100,8 +132,10 @@ const fetchApplications = async (
   limit: number,
   query: string,
   statusFilter: "ALL" | ApplicationStatus,
+  divisionFilter: DivisionFilter,
+  subDivisionFilter: string,
 ): Promise<{ applications: RecruitmentApplication[]; pagination: PaginationData }> => {
-  const response = await fetch(buildApplicationsUrl(page, limit, query, statusFilter), { credentials: "include" });
+  const response = await fetch(buildApplicationsUrl(page, limit, query, statusFilter, divisionFilter, subDivisionFilter), { credentials: "include" });
   const result = (await response.json()) as ApplicationListResponse;
   if (!response.ok) throw new Error(result.error ?? "Gagal memuat data pendaftar");
   return {
@@ -136,6 +170,8 @@ function App() {
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | ApplicationStatus>("ALL");
+  const [divisionFilter, setDivisionFilter] = useState<DivisionFilter>("ALL");
+  const [subDivisionFilter, setSubDivisionFilter] = useState("ALL");
   const [updatingNrp, setUpdatingNrp] = useState("");
   const [selectedApplication, setSelectedApplication] = useState<RecruitmentApplication | null>(null);
 
@@ -143,7 +179,7 @@ function App() {
     setIsRefreshing(true);
     setErrorMessage("");
     try {
-      const result = await fetchApplications(targetPage, pagination.limit, query, statusFilter);
+      const result = await fetchApplications(targetPage, pagination.limit, query, statusFilter, divisionFilter, subDivisionFilter);
       setApplications(result.applications);
       setPagination(result.pagination);
     } catch (error) {
@@ -171,7 +207,7 @@ function App() {
     void loadApplications(pagination.page).catch((error) => {
       if (error instanceof Error && error.message.toLowerCase().includes("unauthorized")) void handleLogout();
     });
-  }, [isAuthenticated, pagination.page, statusFilter, query]);
+  }, [isAuthenticated, pagination.page, statusFilter, query, divisionFilter, subDivisionFilter]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -208,6 +244,8 @@ function App() {
     setQueryInput("");
     setQuery("");
     setStatusFilter("ALL");
+    setDivisionFilter("ALL");
+    setSubDivisionFilter("ALL");
     setErrorMessage("");
     setSelectedApplication(null);
   };
@@ -217,7 +255,7 @@ function App() {
     setIsExporting(true);
     setErrorMessage("");
     try {
-      const response = await fetch(buildExportUrl(query, statusFilter), { credentials: "include" });
+      const response = await fetch(buildExportUrl(query, statusFilter, divisionFilter, subDivisionFilter), { credentials: "include" });
       if (!response.ok) {
         const result = (await response.json()) as { error?: string };
         throw new Error(result.error ?? "Gagal mengekspor spreadsheet");
@@ -346,6 +384,8 @@ function App() {
             <div className="filters">
               <label className="search-field"><span aria-hidden="true">⌕</span><input value={queryInput} onChange={(event) => setQueryInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setPagination((item) => ({ ...item, page: 1 })); setQuery(queryInput); } }} placeholder="Cari nama, NRP, email, atau prodi" /></label>
               <select value={statusFilter} onChange={(event) => { setPagination((item) => ({ ...item, page: 1 })); setStatusFilter(event.target.value as "ALL" | ApplicationStatus); }} aria-label="Filter status"><option value="ALL">Semua status</option>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select>
+              <select value={divisionFilter} onChange={(event) => { setPagination((item) => ({ ...item, page: 1 })); setDivisionFilter(event.target.value as DivisionFilter); setSubDivisionFilter("ALL"); }} aria-label="Filter divisi"><option value="ALL">Semua divisi</option>{divisionOptions.map((division) => <option key={division.value} value={division.value}>{division.label}</option>)}</select>
+              <select value={subDivisionFilter} onChange={(event) => { setPagination((item) => ({ ...item, page: 1 })); setSubDivisionFilter(event.target.value); }} aria-label="Filter sub-divisi" disabled={divisionFilter === "ALL"}><option value="ALL">Semua sub-divisi</option>{divisionFilter !== "ALL" && subDivisionOptions[divisionFilter].map((division) => <option key={division.value} value={division.value}>{division.label}</option>)}</select>
               <button className="filter-button" type="button" onClick={() => { setPagination((item) => ({ ...item, page: 1 })); setQuery(queryInput); }}>Terapkan</button>
             </div>
           </div>
@@ -401,7 +441,11 @@ function App() {
             </section>
             <section className="document-list">
               <h3>Link Portfolio</h3>
-              <a href={selectedApplication.portfolio_url} className="text-sm">{selectedApplication.portfolio_url}</a>
+              <a href={selectedApplication.portfolio_url} className="text-sm">{selectedApplication?.portfolio_url ?? '-'}</a>
+            </section>
+            <section className="document-list">
+              <h3>Special Task</h3>
+              <a href={selectedApplication.special_task_url} className="text-sm">{selectedApplication?.special_task_url ?? '-'}</a>
             </section>
           </div>
         </aside>

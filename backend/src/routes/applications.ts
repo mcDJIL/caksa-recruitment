@@ -109,6 +109,11 @@ const statusFromQuery = (value: unknown): ApplicationStatus | null => {
     : null;
 };
 
+const filterCodeFromQuery = (value: unknown): string | null => {
+  const code = parsedQueryString(value);
+  return /^[a-z-]+$/.test(code) ? code : null;
+};
+
 const isGoogleDocsOrDriveUrl = (value: string): boolean => {
   try {
     const parsed = new URL(value.trim());
@@ -494,6 +499,8 @@ router.get('/export', requireAdmin, async (request, response, next) => {
   try {
     const query = parsedQueryString(request.query.q);
     const status = statusFromQuery(request.query.status);
+    const wing = filterCodeFromQuery(request.query.wing);
+    const division = filterCodeFromQuery(request.query.division);
 
     let exportQuery = supabase
       .from('recruitment_applications')
@@ -511,6 +518,9 @@ router.get('/export', requireAdmin, async (request, response, next) => {
     if (status) {
       exportQuery = exportQuery.or(`status.eq.${status},draft_status.eq.${status}`);
     }
+
+    if (wing) exportQuery = exportQuery.eq('interested_wing_code', wing);
+    if (division) exportQuery = exportQuery.eq('division_code', division);
 
     const { data, error } = await exportQuery;
     if (error) throw error;
@@ -712,6 +722,8 @@ router.get('/', requireAdmin, async (request, response, next) => {
     const to = from + limit - 1;
     const query = parsedQueryString(request.query.q);
     const status = statusFromQuery(request.query.status);
+    const wing = filterCodeFromQuery(request.query.wing);
+    const division = filterCodeFromQuery(request.query.division);
 
     let applicationsQuery = supabase
       .from('recruitment_applications')
@@ -729,6 +741,9 @@ router.get('/', requireAdmin, async (request, response, next) => {
     if (status) {
       applicationsQuery = applicationsQuery.or(`status.eq.${status},draft_status.eq.${status}`);
     }
+
+    if (wing) applicationsQuery = applicationsQuery.eq('interested_wing_code', wing);
+    if (division) applicationsQuery = applicationsQuery.eq('division_code', division);
 
     const { data, error, count } = await applicationsQuery;
 
