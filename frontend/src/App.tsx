@@ -441,11 +441,11 @@ function App() {
             </section>
             <section className="document-list">
               <h3>Link Portfolio</h3>
-              <a href={selectedApplication.portfolio_url} className="text-sm">{selectedApplication?.portfolio_url ?? '-'}</a>
+              <a target="_blank" rel="noreferrer" href={selectedApplication.portfolio_url} className="text-sm">{selectedApplication?.portfolio_url ?? '-'}</a>
             </section>
             <section className="document-list">
               <h3>Special Task</h3>
-              <a href={selectedApplication.special_task_url} className="text-sm">{selectedApplication?.special_task_url ?? '-'}</a>
+              <a target="_blank" rel="noreferrer" href={selectedApplication.special_task_url} className="text-sm">{selectedApplication?.special_task_url ?? '-'}</a>
             </section>
           </div>
         </aside>
