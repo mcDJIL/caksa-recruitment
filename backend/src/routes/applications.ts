@@ -43,6 +43,14 @@ type UploadedFile = Express.Multer.File;
 
 class ApplicationValidationError extends Error {}
 
+type ApplicationScore = {
+  idea: number;
+  relevance: number;
+  skills_experience_achievements: number;
+  identity_contact: number;
+  portfolio: number;
+};
+
 type ApplicationStatus =
   | 'PENDING'
   | 'ADMINISTRATION'
@@ -560,14 +568,12 @@ router.get('/export', requireAdmin, async (request, response, next) => {
       'Parent Permission Letter (Surat Izin Orang Tua) / Parent Permission Letter',
       'Google Drive Link Portfolio (Make sure to set the access into viewer)',
       'Special Task Branding and Internal Division Only (Make sure to set the access into viewer)',
-      'Ide (40 poin)',
+      'Ide (30 poin)',
       'Kerelevanan (20 poin)',
       'Skill Pengalaman, Prestasi yang relevan (20 poin)',
       'Nama, Alamat, Kontak (5 Poin)',
-      'Portofolio (5)',
-      'Additional Doc (10)',
-      'Portofolio (Jika Ada) 15 poin',
-      'Jumlah Poin',
+      'Portofolio (15 poin)',
+      'Jumlah Poin (90)',
       'Status',
       'Noted',
     ];
@@ -602,14 +608,12 @@ router.get('/export', requireAdmin, async (request, response, next) => {
         row.parent_permission_letter_url ?? '',
         row.portfolio_url ?? '',
         additionalDocumentUrls,
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
+        row.idea_score ?? '',
+        row.relevance_score ?? '',
+        row.skills_experience_achievements_score ?? '',
+        row.identity_contact_score ?? '',
+        row.portfolio_score ?? '',
+        row.total_score ?? '',
         row.draft_status ?? row.status,
         '',
       ].map(safeSpreadsheetValue);
@@ -762,6 +766,45 @@ router.get('/', requireAdmin, async (request, response, next) => {
       },
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/:nrp/score', requireAdmin, async (request, response, next) => {
+  try {
+    const rawScore = request.body as Partial<ApplicationScore>;
+    const limits: Record<keyof ApplicationScore, number> = {
+      idea: 30,
+      relevance: 20,
+      skills_experience_achievements: 20,
+      identity_contact: 5,
+      portfolio: 15,
+    };
+    const score = Object.fromEntries(Object.entries(limits).map(([key, max]) => {
+      const value = rawScore[key as keyof ApplicationScore];
+      if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > max) {
+        throw new ApplicationValidationError(`Invalid score for ${key}`);
+      }
+      return [`${key}_score`, value];
+    }));
+    const totalScore = Object.values(score).reduce<number>((total, value) => total + Number(value), 0);
+    const { data, error } = await supabase
+      .from('recruitment_applications')
+      .update({ ...score, total_score: totalScore })
+      .eq('nrp', normalizeNrp(request.params.nrp))
+      .select('nrp, idea_score, relevance_score, skills_experience_achievements_score, identity_contact_score, portfolio_score, total_score, updated_at')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      response.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    response.json(data);
+  } catch (error) {
+    if (error instanceof ApplicationValidationError) {
+      response.status(400).json({ error: error.message });
+      return;
+    }
     next(error);
   }
 });

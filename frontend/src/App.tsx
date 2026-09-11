@@ -19,6 +19,15 @@ type ApplicantDocument = {
   size: number;
 };
 
+type ApplicationScore = {
+  idea: number | null;
+  relevance: number | null;
+  skills_experience_achievements: number | null;
+  identity_contact: number | null;
+  portfolio: number | null;
+  total: number | null;
+};
+
 type RecruitmentApplication = {
   id: string;
   full_name: string;
@@ -34,6 +43,12 @@ type RecruitmentApplication = {
   file_metadata?: ApplicantDocument[];
   portfolio_url?: string;
   special_task_url?: string;
+  idea_score?: number | null;
+  relevance_score?: number | null;
+  skills_experience_achievements_score?: number | null;
+  identity_contact_score?: number | null;
+  portfolio_score?: number | null;
+  total_score?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -174,6 +189,16 @@ function App() {
   const [subDivisionFilter, setSubDivisionFilter] = useState("ALL");
   const [updatingNrp, setUpdatingNrp] = useState("");
   const [selectedApplication, setSelectedApplication] = useState<RecruitmentApplication | null>(null);
+  const [scoreDraft, setScoreDraft] = useState<ApplicationScore | null>(null);
+  const [isSavingScore, setIsSavingScore] = useState(false);
+
+  const scoreCriteria: { key: keyof Omit<ApplicationScore, "total">; label: string; max: number }[] = [
+    { key: "idea", label: "Ide", max: 30 },
+    { key: "relevance", label: "Kerelevanan", max: 20 },
+    { key: "skills_experience_achievements", label: "Skill, pengalaman & prestasi relevan", max: 20 },
+    { key: "identity_contact", label: "Nama, alamat & kontak", max: 5 },
+    { key: "portfolio", label: "Portofolio", max: 15 },
+  ];
 
   const loadApplications = async (targetPage = pagination.page) => {
     setIsRefreshing(true);
@@ -275,6 +300,44 @@ function App() {
       setErrorMessage(error instanceof Error ? error.message : "Gagal mengekspor spreadsheet");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const openApplication = (application: RecruitmentApplication) => {
+    setSelectedApplication(application);
+    setScoreDraft({
+      idea: application.idea_score ?? null,
+      relevance: application.relevance_score ?? null,
+      skills_experience_achievements: application.skills_experience_achievements_score ?? null,
+      identity_contact: application.identity_contact_score ?? null,
+      portfolio: application.portfolio_score ?? null,
+      total: application.total_score ?? null,
+    });
+  };
+
+  const handleScoreUpdate = async () => {
+    if (!isAuthenticated || !selectedApplication || !scoreDraft || scoreCriteria.some(({ key }) => scoreDraft[key] === null)) return;
+    setIsSavingScore(true);
+    setErrorMessage("");
+    setNoticeMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/applications/${encodeURIComponent(selectedApplication.nrp)}/score`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(scoreDraft),
+      });
+      const result = await response.json() as { error?: string; updated_at?: string; idea_score?: number; relevance_score?: number; skills_experience_achievements_score?: number; identity_contact_score?: number; portfolio_score?: number; total_score?: number };
+      if (!response.ok) throw new Error(result.error ?? "Gagal menyimpan penilaian");
+      const updated = { ...selectedApplication, ...result };
+      setSelectedApplication(updated);
+      setScoreDraft({ idea: result.idea_score ?? null, relevance: result.relevance_score ?? null, skills_experience_achievements: result.skills_experience_achievements_score ?? null, identity_contact: result.identity_contact_score ?? null, portfolio: result.portfolio_score ?? null, total: result.total_score ?? null });
+      setApplications((items) => items.map((item) => item.nrp === updated.nrp ? updated : item));
+      setNoticeMessage("Penilaian kandidat berhasil disimpan.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Gagal menyimpan penilaian");
+    } finally {
+      setIsSavingScore(false);
     }
   };
 
@@ -392,7 +455,7 @@ function App() {
           {errorMessage && <p className="alert panel-alert" role="alert">{errorMessage}</p>}
           {noticeMessage && <p className="notice panel-alert" role="status">{noticeMessage}</p>}
           <div className="table-wrap"><table><thead><tr><th>NRP</th><th>Kandidat</th><th>Akademik</th><th>Wing / divisi</th><th>Dokumen</th><th>Status</th><th>Didaftarkan</th></tr></thead><tbody>
-            {applications.map((application) => <tr key={application.id} onClick={() => setSelectedApplication(application)}><td className="nrp">{application.nrp}</td><td><strong>{application.full_name}</strong><span>{application.email}</span></td><td><strong>{application.degree_level_code}</strong><span>{application.study_program_code} · {application.batch_year}</span></td><td><strong>{application.interested_wing_code}</strong><span>{application.division_code}</span></td><td><span className="file-count">{application.file_metadata?.length ?? 0} berkas</span></td><td><select className={`status-select ${statusTone[activeStatus(application)]}`} value={activeStatus(application)} onChange={(event) => { event.stopPropagation(); void handleStatusUpdate(application.nrp, event.target.value as ApplicationStatus); }} onClick={(event) => event.stopPropagation()} disabled={updatingNrp === application.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select>{application.draft_status && <small className="draft-label">Draft · belum diumumkan</small>}{updatingNrp === application.nrp && <small>Memperbarui…</small>}</td><td className="date-cell">{new Date(application.created_at).toLocaleString("id-ID")}</td></tr>)}
+            {applications.map((application) => <tr key={application.id} onClick={() => openApplication(application)}><td className="nrp">{application.nrp}</td><td><strong>{application.full_name}</strong><span>{application.email}</span></td><td><strong>{application.degree_level_code}</strong><span>{application.study_program_code} · {application.batch_year}</span></td><td><strong>{application.interested_wing_code}</strong><span>{application.division_code}</span></td><td><span className="file-count">{application.file_metadata?.length ?? 0} berkas</span></td><td><select className={`status-select ${statusTone[activeStatus(application)]}`} value={activeStatus(application)} onChange={(event) => { event.stopPropagation(); void handleStatusUpdate(application.nrp, event.target.value as ApplicationStatus); }} onClick={(event) => event.stopPropagation()} disabled={updatingNrp === application.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select>{application.draft_status && <small className="draft-label">Draft · belum diumumkan</small>}{updatingNrp === application.nrp && <small>Memperbarui…</small>}</td><td className="date-cell">{new Date(application.created_at).toLocaleString("id-ID")}</td></tr>)}
           </tbody></table></div>
           {applications.length === 0 && <p className="empty-state">Belum ada pendaftar yang cocok dengan filter ini.</p>}
           <footer className="panel-footer"><p>Menampilkan <b>{applications.length}</b> dari <b>{pagination.total}</b> kandidat</p><div className="pagination"><button type="button" disabled={pagination.page <= 1 || isRefreshing} onClick={() => setPagination((item) => ({ ...item, page: item.page - 1 }))}>Sebelumnya</button><span>{pagination.page} / {pagination.totalPages}</span><button type="button" disabled={pagination.page >= pagination.totalPages || isRefreshing} onClick={() => setPagination((item) => ({ ...item, page: item.page + 1 }))}>Berikutnya</button></div></footer>
@@ -438,6 +501,11 @@ function App() {
             <section className="document-list">
               <h3>Dokumen <span>{selectedApplication.file_metadata?.length ?? 0}</span>
               </h3>{(selectedApplication.file_metadata ?? []).length === 0 && <p className="no-documents">Tidak ada dokumen yang dilampirkan.</p>}{(selectedApplication.file_metadata ?? []).map((file) => <article key={`${file.fieldName}-${file.originalName}`}><div><strong>{file.fieldName}</strong>{file.url ? <a href={file.url} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}</div><small>{file.mimeType} · {readableFileSize(file.size)}</small></article>)}
+            </section>
+            <section className="score-card">
+              <div className="score-heading"><div><p className="eyebrow">Candidate assessment</p><h3>Penilaian kandidat</h3></div><strong>{scoreDraft && scoreCriteria.every(({ key }) => scoreDraft[key] !== null) ? scoreCriteria.reduce((total, { key }) => total + (scoreDraft[key] ?? 0), 0) : "—"}<small>/ 90</small></strong></div>
+              <div className="score-fields">{scoreCriteria.map(({ key, label, max }) => <label key={key}><span>{label}<small>0–{max}</small></span><input type="number" min="0" max={max} value={scoreDraft?.[key] ?? ""} onChange={(event) => setScoreDraft((current) => current ? { ...current, [key]: event.target.value === "" ? null : Number(event.target.value), total: null } : current)} /></label>)}</div>
+              <button className="primary-button score-save" type="button" onClick={() => void handleScoreUpdate()} disabled={isSavingScore || !scoreDraft || scoreCriteria.some(({ key }) => scoreDraft[key] === null)}>{isSavingScore ? "Menyimpan…" : "Simpan penilaian"}</button>
             </section>
             <section className="document-list">
               <h3>Link Portfolio</h3>
