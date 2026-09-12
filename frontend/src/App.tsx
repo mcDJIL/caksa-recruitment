@@ -9,6 +9,8 @@ type ApplicationStatus =
   | "NOT_SELECTED_ADMINISTRATION"
   | "NOT_SELECTED_INTERVIEW";
 
+type AcceptancePriority = "HIGH" | "MEDIUM" | "LOW";
+
 type ApplicantDocument = {
   fieldName: string;
   driveFileId?: string;
@@ -49,6 +51,7 @@ type RecruitmentApplication = {
   identity_contact_score?: number | null;
   portfolio_score?: number | null;
   total_score?: number | null;
+  acceptance_priority?: AcceptancePriority | null;
   created_at: string;
   updated_at: string;
 };
@@ -122,6 +125,12 @@ const statusTone: Record<ApplicationStatus, string> = {
   NOT_SELECTED_INTERVIEW: "not-selected",
 };
 
+const acceptancePriorityLabel: Record<AcceptancePriority, string> = {
+  HIGH: "Tinggi",
+  MEDIUM: "Sedang",
+  LOW: "Rendah",
+};
+
 const buildApplicationsUrl = (page: number, limit: number, query: string, statusFilter: "ALL" | ApplicationStatus, divisionFilter: DivisionFilter, subDivisionFilter: string) => {
   const url = new URL(`${API_BASE}/applications`);
   url.searchParams.set("page", String(page));
@@ -191,6 +200,7 @@ function App() {
   const [selectedApplication, setSelectedApplication] = useState<RecruitmentApplication | null>(null);
   const [scoreDraft, setScoreDraft] = useState<ApplicationScore | null>(null);
   const [isSavingScore, setIsSavingScore] = useState(false);
+  const [isSavingPriority, setIsSavingPriority] = useState(false);
 
   const scoreCriteria: { key: keyof Omit<ApplicationScore, "total">; label: string; max: number }[] = [
     { key: "idea", label: "Ide", max: 30 },
@@ -341,6 +351,31 @@ function App() {
     }
   };
 
+  const handleAcceptancePriorityUpdate = async (acceptancePriority: AcceptancePriority | null) => {
+    if (!isAuthenticated || !selectedApplication || selectedApplication.division_code !== "electrical") return;
+    setIsSavingPriority(true);
+    setErrorMessage("");
+    setNoticeMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/applications/${encodeURIComponent(selectedApplication.nrp)}/acceptance-priority`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acceptancePriority }),
+      });
+      const result = await response.json() as { error?: string; acceptance_priority?: AcceptancePriority | null; updated_at?: string };
+      if (!response.ok) throw new Error(result.error ?? "Gagal menyimpan prioritas penerimaan");
+      const updated = { ...selectedApplication, acceptance_priority: result.acceptance_priority ?? null, updated_at: result.updated_at ?? selectedApplication.updated_at };
+      setSelectedApplication(updated);
+      setApplications((items) => items.map((item) => item.nrp === updated.nrp ? updated : item));
+      setNoticeMessage("Prioritas penerimaan berhasil disimpan.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Gagal menyimpan prioritas penerimaan");
+    } finally {
+      setIsSavingPriority(false);
+    }
+  };
+
   const handleStatusUpdate = async (nrp: string, status: ApplicationStatus) => {
     if (!isAuthenticated) return;
     setUpdatingNrp(nrp);
@@ -454,15 +489,29 @@ function App() {
           </div>
           {errorMessage && <p className="alert panel-alert" role="alert">{errorMessage}</p>}
           {noticeMessage && <p className="notice panel-alert" role="status">{noticeMessage}</p>}
-          <div className="table-wrap"><table><thead><tr><th>NRP</th><th>Kandidat</th><th>Akademik</th><th>Wing / divisi</th><th>Dokumen</th><th>Status</th><th>Didaftarkan</th></tr></thead><tbody>
-            {applications.map((application) => <tr key={application.id} onClick={() => openApplication(application)}><td className="nrp">{application.nrp}</td><td><strong>{application.full_name}</strong><span>{application.email}</span></td><td><strong>{application.degree_level_code}</strong><span>{application.study_program_code} · {application.batch_year}</span></td><td><strong>{application.interested_wing_code}</strong><span>{application.division_code}</span></td><td><span className="file-count">{application.file_metadata?.length ?? 0} berkas</span></td><td><select className={`status-select ${statusTone[activeStatus(application)]}`} value={activeStatus(application)} onChange={(event) => { event.stopPropagation(); void handleStatusUpdate(application.nrp, event.target.value as ApplicationStatus); }} onClick={(event) => event.stopPropagation()} disabled={updatingNrp === application.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select>{application.draft_status && <small className="draft-label">Draft · belum diumumkan</small>}{updatingNrp === application.nrp && <small>Memperbarui…</small>}</td><td className="date-cell">{new Date(application.created_at).toLocaleString("id-ID")}</td></tr>)}
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>NRP</th>
+                  <th>Kandidat</th>
+                  <th>Akademik</th>
+                  <th>Wing / divisi</th>
+                  <th>Dokumen</th>
+                  <th>Status</th>
+                  <th>Prioritas</th>
+                  <th>Didaftarkan</th>
+                </tr>
+              </thead>
+              <tbody>
+            {applications.map((application) => <tr key={application.id} onClick={() => openApplication(application)}><td className="nrp">{application.nrp}</td><td><strong>{application.full_name}</strong><span>{application.email}</span></td><td><strong>{application.degree_level_code}</strong><span>{application.study_program_code} · {application.batch_year}</span></td><td><strong>{application.interested_wing_code}</strong><span>{application.division_code}</span></td><td><span className="file-count">{application.file_metadata?.length ?? 0} berkas</span></td><td><select className={`status-select ${statusTone[activeStatus(application)]}`} value={activeStatus(application)} onChange={(event) => { event.stopPropagation(); void handleStatusUpdate(application.nrp, event.target.value as ApplicationStatus); }} onClick={(event) => event.stopPropagation()} disabled={updatingNrp === application.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}</select>{application.draft_status && <small className="draft-label">Draft · belum diumumkan</small>}{updatingNrp === application.nrp && <small>Memperbarui…</small>}</td><td>{application.division_code === "electrical" ? application.acceptance_priority ? acceptancePriorityLabel[application.acceptance_priority] : "Belum diatur" : "—"}</td><td className="date-cell">{new Date(application.created_at).toLocaleString("id-ID")}</td></tr>)}
           </tbody></table></div>
           {applications.length === 0 && <p className="empty-state">Belum ada pendaftar yang cocok dengan filter ini.</p>}
           <footer className="panel-footer"><p>Menampilkan <b>{applications.length}</b> dari <b>{pagination.total}</b> kandidat</p><div className="pagination"><button type="button" disabled={pagination.page <= 1 || isRefreshing} onClick={() => setPagination((item) => ({ ...item, page: item.page - 1 }))}>Sebelumnya</button><span>{pagination.page} / {pagination.totalPages}</span><button type="button" disabled={pagination.page >= pagination.totalPages || isRefreshing} onClick={() => setPagination((item) => ({ ...item, page: item.page + 1 }))}>Berikutnya</button></div></footer>
         </section>
       </div>
 
-      {selectedApplication && 
+      {selectedApplication &&
         <div className="modal-backdrop" onClick={() => setSelectedApplication(null)}>
           <aside className="detail-panel" onClick={(event) => event.stopPropagation()} aria-modal="true" role="dialog" aria-labelledby="detail-name">
             <header>
@@ -479,45 +528,52 @@ function App() {
                 <select id="detail-status" className={`status-select ${statusTone[activeStatus(selectedApplication)]}`} value={activeStatus(selectedApplication)} onChange={(event) => void handleStatusUpdate(selectedApplication.nrp, event.target.value as ApplicationStatus)} disabled={updatingNrp === selectedApplication.nrp}>{statusOptions.map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}
                 </select>{selectedApplication.draft_status && <p className="draft-label">Tersimpan sebagai draft dan belum terlihat oleh peserta.</p>}
               </section>
-            <div className="detail-grid">
-              <section>
-                <h3>Kontak</h3>
-                <p>{selectedApplication.email}</p>
-                <p>NRP · {selectedApplication.nrp}</p>
+              {selectedApplication.division_code === "electrical" && <section className="detail-status">
+                <label htmlFor="acceptance-priority">Prioritas penerimaan</label>
+                <select id="acceptance-priority" className="status-select" value={selectedApplication.acceptance_priority ?? ""} onChange={(event) => void handleAcceptancePriorityUpdate(event.target.value === "" ? null : event.target.value as AcceptancePriority)} disabled={isSavingPriority}>
+                  <option value="">Belum diatur</option>
+                  {Object.entries(acceptancePriorityLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </section>}
+              <div className="detail-grid">
+                <section>
+                  <h3>Kontak</h3>
+                  <p>{selectedApplication.email}</p>
+                  <p>NRP · {selectedApplication.nrp}</p>
+                </section>
+                <section>
+                  <h3>Akademik</h3>
+                  <p>{selectedApplication.degree_level_code}</p>
+                  <p>{selectedApplication.study_program_code} · {selectedApplication.batch_year}</p>
+                </section>
+                <section>
+                  <h3>Penempatan</h3>
+                  <p>Divisi · {selectedApplication.interested_wing_code}</p>
+                  <p>Subivisi · {selectedApplication.division_code}</p></section><section><h3>Waktu</h3>
+                  <p>Masuk · {new Date(selectedApplication.created_at).toLocaleString("id-ID")}</p>
+                  <p>Update · {new Date(selectedApplication.updated_at).toLocaleString("id-ID")}</p>
+                </section>
+              </div>
+              <section className="document-list">
+                <h3>Dokumen <span>{selectedApplication.file_metadata?.length ?? 0}</span>
+                </h3>{(selectedApplication.file_metadata ?? []).length === 0 && <p className="no-documents">Tidak ada dokumen yang dilampirkan.</p>}{(selectedApplication.file_metadata ?? []).map((file) => <article key={`${file.fieldName}-${file.originalName}`}><div><strong>{file.fieldName}</strong>{file.url ? <a href={file.url} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}</div><small>{file.mimeType} · {readableFileSize(file.size)}</small></article>)}
               </section>
-              <section>
-                <h3>Akademik</h3>
-                <p>{selectedApplication.degree_level_code}</p>
-                <p>{selectedApplication.study_program_code} · {selectedApplication.batch_year}</p>
+              <section className="score-card">
+                <div className="score-heading"><div><p className="eyebrow">Candidate assessment</p><h3>Penilaian kandidat</h3></div><strong>{scoreDraft && scoreCriteria.every(({ key }) => scoreDraft[key] !== null) ? scoreCriteria.reduce((total, { key }) => total + (scoreDraft[key] ?? 0), 0) : "—"}<small>/ 90</small></strong></div>
+                <div className="score-fields">{scoreCriteria.map(({ key, label, max }) => <label key={key}><span>{label}<small>0–{max}</small></span><input type="number" min="0" max={max} value={scoreDraft?.[key] ?? ""} onChange={(event) => setScoreDraft((current) => current ? { ...current, [key]: event.target.value === "" ? null : Number(event.target.value), total: null } : current)} /></label>)}</div>
+                <button className="primary-button score-save" type="button" onClick={() => void handleScoreUpdate()} disabled={isSavingScore || !scoreDraft || scoreCriteria.some(({ key }) => scoreDraft[key] === null)}>{isSavingScore ? "Menyimpan…" : "Simpan penilaian"}</button>
               </section>
-              <section>
-                <h3>Penempatan</h3>
-                <p>Divisi · {selectedApplication.interested_wing_code}</p>
-                <p>Subivisi · {selectedApplication.division_code}</p></section><section><h3>Waktu</h3>
-                <p>Masuk · {new Date(selectedApplication.created_at).toLocaleString("id-ID")}</p>
-                <p>Update · {new Date(selectedApplication.updated_at).toLocaleString("id-ID")}</p>
+              <section className="document-list">
+                <h3>Link Portfolio</h3>
+                <a target="_blank" rel="noreferrer" href={selectedApplication.portfolio_url} className="text-sm">{selectedApplication?.portfolio_url ?? '-'}</a>
+              </section>
+              <section className="document-list">
+                <h3>Special Task</h3>
+                <a target="_blank" rel="noreferrer" href={selectedApplication.special_task_url} className="text-sm">{selectedApplication?.special_task_url ?? '-'}</a>
               </section>
             </div>
-            <section className="document-list">
-              <h3>Dokumen <span>{selectedApplication.file_metadata?.length ?? 0}</span>
-              </h3>{(selectedApplication.file_metadata ?? []).length === 0 && <p className="no-documents">Tidak ada dokumen yang dilampirkan.</p>}{(selectedApplication.file_metadata ?? []).map((file) => <article key={`${file.fieldName}-${file.originalName}`}><div><strong>{file.fieldName}</strong>{file.url ? <a href={file.url} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}</div><small>{file.mimeType} · {readableFileSize(file.size)}</small></article>)}
-            </section>
-            <section className="score-card">
-              <div className="score-heading"><div><p className="eyebrow">Candidate assessment</p><h3>Penilaian kandidat</h3></div><strong>{scoreDraft && scoreCriteria.every(({ key }) => scoreDraft[key] !== null) ? scoreCriteria.reduce((total, { key }) => total + (scoreDraft[key] ?? 0), 0) : "—"}<small>/ 90</small></strong></div>
-              <div className="score-fields">{scoreCriteria.map(({ key, label, max }) => <label key={key}><span>{label}<small>0–{max}</small></span><input type="number" min="0" max={max} value={scoreDraft?.[key] ?? ""} onChange={(event) => setScoreDraft((current) => current ? { ...current, [key]: event.target.value === "" ? null : Number(event.target.value), total: null } : current)} /></label>)}</div>
-              <button className="primary-button score-save" type="button" onClick={() => void handleScoreUpdate()} disabled={isSavingScore || !scoreDraft || scoreCriteria.some(({ key }) => scoreDraft[key] === null)}>{isSavingScore ? "Menyimpan…" : "Simpan penilaian"}</button>
-            </section>
-            <section className="document-list">
-              <h3>Link Portfolio</h3>
-              <a target="_blank" rel="noreferrer" href={selectedApplication.portfolio_url} className="text-sm">{selectedApplication?.portfolio_url ?? '-'}</a>
-            </section>
-            <section className="document-list">
-              <h3>Special Task</h3>
-              <a target="_blank" rel="noreferrer" href={selectedApplication.special_task_url} className="text-sm">{selectedApplication?.special_task_url ?? '-'}</a>
-            </section>
-          </div>
-        </aside>
-      </div>}
+          </aside>
+        </div>}
     </main>
   );
 }

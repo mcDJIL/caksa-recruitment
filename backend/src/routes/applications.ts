@@ -59,6 +59,8 @@ type ApplicationStatus =
   | 'NOT_SELECTED_ADMINISTRATION'
   | 'NOT_SELECTED_INTERVIEW';
 
+type AcceptancePriority = 'HIGH' | 'MEDIUM' | 'LOW';
+
 const applicationStatuses: ApplicationStatus[] = [
   'PENDING',
   'ADMINISTRATION',
@@ -67,6 +69,8 @@ const applicationStatuses: ApplicationStatus[] = [
   'NOT_SELECTED_ADMINISTRATION',
   'NOT_SELECTED_INTERVIEW',
 ];
+
+const acceptancePriorities: AcceptancePriority[] = ['HIGH', 'MEDIUM', 'LOW'];
 
 const requiredString = (value: unknown, field: string): string => {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -574,6 +578,7 @@ router.get('/export', requireAdmin, async (request, response, next) => {
       'Nama, Alamat, Kontak (5 Poin)',
       'Portofolio (15 poin)',
       'Jumlah Poin (90)',
+      'Prioritas penerimaan Electrical',
       'Status',
       'Noted',
     ];
@@ -614,6 +619,7 @@ router.get('/export', requireAdmin, async (request, response, next) => {
         row.identity_contact_score ?? '',
         row.portfolio_score ?? '',
         row.total_score ?? '',
+        row.acceptance_priority ?? '',
         row.draft_status ?? row.status,
         '',
       ].map(safeSpreadsheetValue);
@@ -805,6 +811,46 @@ router.patch('/:nrp/score', requireAdmin, async (request, response, next) => {
       response.status(400).json({ error: error.message });
       return;
     }
+    next(error);
+  }
+});
+
+router.patch('/:nrp/acceptance-priority', requireAdmin, async (request, response, next) => {
+  try {
+    const acceptancePriority = request.body?.acceptancePriority as AcceptancePriority | null;
+    if (acceptancePriority !== null && !acceptancePriorities.includes(acceptancePriority)) {
+      response.status(400).json({ error: 'Invalid acceptance priority' });
+      return;
+    }
+
+    const { data: application, error: applicationError } = await supabase
+      .from('recruitment_applications')
+      .select('division_code')
+      .eq('nrp', normalizeNrp(request.params.nrp))
+      .maybeSingle();
+    if (applicationError) throw applicationError;
+    if (!application) {
+      response.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    if (application.division_code !== 'electrical') {
+      response.status(400).json({ error: 'Acceptance priority is only available for Electrical applicants' });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('recruitment_applications')
+      .update({ acceptance_priority: acceptancePriority })
+      .eq('nrp', normalizeNrp(request.params.nrp))
+      .select('nrp, acceptance_priority, updated_at')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      response.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    response.json(data);
+  } catch (error) {
     next(error);
   }
 });
