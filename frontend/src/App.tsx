@@ -9,7 +9,7 @@ type ApplicationStatus =
   | "NOT_SELECTED_ADMINISTRATION"
   | "NOT_SELECTED_INTERVIEW";
 
-type AcceptancePriority = "HIGH" | "MEDIUM" | "LOW";
+type AcceptancePriority = "HIGH" | "MEDIUM" | "LOW" | "NOT_RECOMMENDED";
 
 type ApplicantDocument = {
   fieldName: string;
@@ -129,6 +129,7 @@ const acceptancePriorityLabel: Record<AcceptancePriority, string> = {
   HIGH: "Tinggi",
   MEDIUM: "Sedang",
   LOW: "Rendah",
+  NOT_RECOMMENDED: "Tidak Relevan",
 };
 
 const buildApplicationsUrl = (page: number, limit: number, query: string, statusFilter: "ALL" | ApplicationStatus, divisionFilter: DivisionFilter, subDivisionFilter: string) => {
