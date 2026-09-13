@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import "./App.css";
 
 type ApplicationStatus =
@@ -68,6 +68,22 @@ type ApplicationListResponse = {
   pagination?: PaginationData;
   error?: string;
 };
+
+type StatusCounts = Record<ApplicationStatus, number>;
+
+type ApplicationSummaryResponse = {
+  statusCounts?: Partial<StatusCounts>;
+  error?: string;
+};
+
+const emptyStatusCounts = (): StatusCounts => ({
+  PENDING: 0,
+  ADMINISTRATION: 0,
+  INTERVIEW: 0,
+  MEMBER: 0,
+  NOT_SELECTED_ADMINISTRATION: 0,
+  NOT_SELECTED_INTERVIEW: 0,
+});
 
 type DivisionFilter = "ALL" | "technical" | "research-development" | "non-technical";
 
@@ -143,6 +159,14 @@ const buildApplicationsUrl = (page: number, limit: number, query: string, status
   return url.toString();
 };
 
+const buildSummaryUrl = (query: string, divisionFilter: DivisionFilter, subDivisionFilter: string) => {
+  const url = new URL(`${API_BASE}/applications/summary`);
+  if (query.trim()) url.searchParams.set("q", query.trim());
+  if (divisionFilter !== "ALL") url.searchParams.set("wing", divisionFilter);
+  if (subDivisionFilter !== "ALL") url.searchParams.set("division", subDivisionFilter);
+  return url.toString();
+};
+
 const buildExportUrl = (query: string, statusFilter: "ALL" | ApplicationStatus, divisionFilter: DivisionFilter, subDivisionFilter: string) => {
   const url = new URL(`${API_BASE}/applications/export`);
   if (query.trim()) url.searchParams.set("q", query.trim());
@@ -169,6 +193,13 @@ const fetchApplications = async (
   };
 };
 
+const fetchStatusCounts = async (query: string, divisionFilter: DivisionFilter, subDivisionFilter: string): Promise<StatusCounts> => {
+  const response = await fetch(buildSummaryUrl(query, divisionFilter, subDivisionFilter), { credentials: "include" });
+  const result = (await response.json()) as ApplicationSummaryResponse;
+  if (!response.ok) throw new Error(result.error ?? "Gagal memuat ringkasan pendaftar");
+  return { ...emptyStatusCounts(), ...result.statusCounts };
+};
+
 const readableFileSize = (value: number): string => {
   if (!Number.isFinite(value) || value <= 0) return "0 B";
   if (value < 1024) return `${value} B`;
@@ -190,6 +221,7 @@ function App() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState("");
   const [applications, setApplications] = useState<RecruitmentApplication[]>([]);
+  const [statusCounts, setStatusCounts] = useState<StatusCounts>(emptyStatusCounts);
   const [pagination, setPagination] = useState<PaginationData>({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [errorMessage, setErrorMessage] = useState("");
   const [queryInput, setQueryInput] = useState("");
@@ -215,8 +247,12 @@ function App() {
     setIsRefreshing(true);
     setErrorMessage("");
     try {
-      const result = await fetchApplications(targetPage, pagination.limit, query, statusFilter, divisionFilter, subDivisionFilter);
+      const [result, statusCounts] = await Promise.all([
+        fetchApplications(targetPage, pagination.limit, query, statusFilter, divisionFilter, subDivisionFilter),
+        fetchStatusCounts(query, divisionFilter, subDivisionFilter),
+      ]);
       setApplications(result.applications);
+      setStatusCounts(statusCounts);
       setPagination(result.pagination);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal memuat data pendaftar");
@@ -276,6 +312,7 @@ function App() {
     setIsAuthenticated(false);
     setAdminTokenInput("");
     setApplications([]);
+    setStatusCounts(emptyStatusCounts());
     setPagination({ page: 1, limit: 10, total: 0, totalPages: 1 });
     setQueryInput("");
     setQuery("");
@@ -420,11 +457,6 @@ function App() {
 
   const activeStatus = (application: RecruitmentApplication): ApplicationStatus => application.draft_status ?? application.status;
 
-  const statusCount = useMemo(() => applications.reduce<Record<ApplicationStatus, number>>((count, item) => {
-    count[activeStatus(item)] += 1;
-    return count;
-  }, { PENDING: 0, ADMINISTRATION: 0, INTERVIEW: 0, MEMBER: 0, NOT_SELECTED_ADMINISTRATION: 0, NOT_SELECTED_INTERVIEW: 0 }), [applications]);
-
   if (isBooting) {
     return <main className="boot-screen"><span className="pulse-dot" />Menyiapkan ruang operasi CAKSA</main>;
   }
@@ -474,7 +506,7 @@ function App() {
 
         <section className="metrics" aria-label="Ringkasan pendaftar">
           <article className="metric-card metric-total"><p>Total kandidat</p><strong>{pagination.total}</strong><span>Halaman {pagination.page} dari {pagination.totalPages}</span></article>
-          {statusOptions.map((status) => <article className={`metric-card ${statusTone[status]}`} key={status}><p>{statusLabel[status]}</p><strong>{statusCount[status]}</strong><span>{status === "MEMBER" ? "kandidat terpilih" : "pada halaman ini"}</span></article>)}
+          {statusOptions.map((status) => <article className={`metric-card ${statusTone[status]}`} key={status}><p>{statusLabel[status]}</p><strong>{statusCounts[status]}</strong><span>{status === "MEMBER" ? "kandidat terpilih" : "seluruh kandidat"}</span></article>)}
         </section>
 
         <section className="data-panel">

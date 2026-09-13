@@ -704,6 +704,39 @@ router.get('/export', requireAdmin, async (request, response, next) => {
   }
 });
 
+router.get('/summary', requireAdmin, async (request, response, next) => {
+  try {
+    const query = parsedQueryString(request.query.q);
+    const wing = filterCodeFromQuery(request.query.wing);
+    const division = filterCodeFromQuery(request.query.division);
+
+    const statusCounts = await Promise.all(applicationStatuses.map(async (status) => {
+      let countQuery = supabase
+        .from('recruitment_applications')
+        .select('id', { count: 'exact', head: true })
+        .or(`and(status.eq.${status},draft_status.is.null),draft_status.eq.${status}`);
+
+      if (query) {
+        const ilike = `%${escapedForIlike(query)}%`;
+        countQuery = countQuery.or(
+          `nrp.ilike.${ilike},full_name.ilike.${ilike},email.ilike.${ilike},study_program_code.ilike.${ilike}`,
+        );
+      }
+
+      if (wing) countQuery = countQuery.eq('interested_wing_code', wing);
+      if (division) countQuery = countQuery.eq('division_code', division);
+
+      const { count, error } = await countQuery;
+      if (error) throw error;
+      return [status, count ?? 0] as const;
+    }));
+
+    response.json({ statusCounts: Object.fromEntries(statusCounts) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:nrp', trackingRateLimit, async (request, response, next) => {
   try {
     const nrp = normalizeNrp(request.params.nrp);
