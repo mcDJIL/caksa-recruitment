@@ -59,7 +59,7 @@ type ApplicationStatus =
   | 'NOT_SELECTED_ADMINISTRATION'
   | 'NOT_SELECTED_INTERVIEW';
 
-type AcceptancePriority = 'HIGH' | 'MEDIUM' | 'LOW';
+type AcceptancePriority = 'HIGH' | 'MEDIUM' | 'LOW' | 'NOT_RECOMMENDED';
 
 const applicationStatuses: ApplicationStatus[] = [
   'PENDING',
@@ -70,7 +70,7 @@ const applicationStatuses: ApplicationStatus[] = [
   'NOT_SELECTED_INTERVIEW',
 ];
 
-const acceptancePriorities: AcceptancePriority[] = ['HIGH', 'MEDIUM', 'LOW'];
+const acceptancePriorities: AcceptancePriority[] = ['HIGH', 'MEDIUM', 'LOW', 'NOT_RECOMMENDED'];
 
 const requiredString = (value: unknown, field: string): string => {
   if (typeof value !== 'string' || value.trim() === '') {
