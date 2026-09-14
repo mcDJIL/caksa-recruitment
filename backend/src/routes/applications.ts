@@ -815,6 +815,17 @@ router.get('/', requireAdmin, async (request, response, next) => {
 router.patch('/:nrp/score', requireAdmin, async (request, response, next) => {
   try {
     const rawScore = request.body as Partial<ApplicationScore>;
+    const { data: application, error: applicationError } = await supabase
+      .from('recruitment_applications')
+      .select('division_code')
+      .eq('nrp', normalizeNrp(request.params.nrp))
+      .maybeSingle();
+    if (applicationError) throw applicationError;
+    if (!application) {
+      response.status(404).json({ error: 'Application not found' });
+      return;
+    }
+
     const limits: Record<keyof ApplicationScore, number> = {
       idea: 30,
       relevance: 20,
@@ -823,13 +834,19 @@ router.patch('/:nrp/score', requireAdmin, async (request, response, next) => {
       portfolio: 15,
       special_task: 10,
     };
-    const score = Object.fromEntries(Object.entries(limits).map(([key, max]) => {
+    const requiresSpecialTask = ['internal', 'branding'].includes(application.division_code);
+    const score: Record<string, number | null> = {};
+    for (const [key, max] of Object.entries(limits)) {
       const value = rawScore[key as keyof ApplicationScore];
+      if (key === 'special_task' && !requiresSpecialTask && value == null) {
+        score.special_task_score = null;
+        continue;
+      }
       if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > max) {
         throw new ApplicationValidationError(`Invalid score for ${key}`);
       }
-      return [`${key}_score`, value];
-    }));
+      score[`${key}_score`] = value as number;
+    }
     const totalScore = Object.values(score).reduce<number>((total, value) => total + Number(value), 0);
     const { data, error } = await supabase
       .from('recruitment_applications')

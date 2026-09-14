@@ -27,6 +27,7 @@ type ApplicationScore = {
   skills_experience_achievements: number | null;
   identity_contact: number | null;
   portfolio: number | null;
+  special_task: number | null;
   total: number | null;
 };
 
@@ -50,6 +51,7 @@ type RecruitmentApplication = {
   skills_experience_achievements_score?: number | null;
   identity_contact_score?: number | null;
   portfolio_score?: number | null;
+  special_task_score?: number | null;
   total_score?: number | null;
   acceptance_priority?: AcceptancePriority | null;
   created_at: string;
@@ -317,6 +319,9 @@ function App() {
     },
     { key: "identity_contact", label: "Nama, alamat & kontak", max: 5 },
     { key: "portfolio", label: "Portofolio", max: 15 },
+    ...(selectedApplication && ["internal", "branding"].includes(selectedApplication.division_code)
+      ? [{ key: "special_task" as const, label: "Special task", max: 10 }]
+      : []),
   ];
 
   const loadApplications = async (targetPage = pagination.page) => {
@@ -469,6 +474,7 @@ function App() {
         application.skills_experience_achievements_score ?? null,
       identity_contact: application.identity_contact_score ?? null,
       portfolio: application.portfolio_score ?? null,
+      special_task: application.special_task_score ?? null,
       total: application.total_score ?? null,
     });
   };
@@ -502,6 +508,7 @@ function App() {
         skills_experience_achievements_score?: number;
         identity_contact_score?: number;
         portfolio_score?: number;
+        special_task_score?: number;
         total_score?: number;
       };
       if (!response.ok)
@@ -515,6 +522,7 @@ function App() {
           result.skills_experience_achievements_score ?? null,
         identity_contact: result.identity_contact_score ?? null,
         portfolio: result.portfolio_score ?? null,
+        special_task: result.special_task_score ?? null,
         total: result.total_score ?? null,
       });
       setApplications((items) =>
@@ -670,7 +678,7 @@ function App() {
     if (
       !isAuthenticated ||
       !window.confirm(
-        "Kirim email pengumuman ke seluruh kandidat yang lolos administrasi? Technical dan R&D menerima informasi test skill dan wawancara; Non-Technical menerima informasi wawancara.",
+        "Kirim email test saja ke mdjauharil29@gmail.com? Kandidat lain tidak akan menerima email.",
       )
     )
       return;
@@ -686,6 +694,7 @@ function App() {
         headers: {
           "Content-Type": "application/json"
         },
+        body: JSON.stringify({ test: true }),
       });
 
       const result = (await response.json()) as {
@@ -842,7 +851,7 @@ function App() {
               onClick={() => void handleSendEmail()}
               disabled={isSendingEmail || isRefreshing}
             >
-              {isSendingEmail ? "Mengirim email…" : "Kirim email"}
+              {isSendingEmail ? "Mengirim test email…" : "Kirim test email"}
             </button>
             <button
               className="primary-button compact"
@@ -1257,7 +1266,7 @@ function App() {
                           0,
                         )
                       : "—"}
-                    <small>/ 90</small>
+                    <small>/ {scoreCriteria.reduce((total, { max }) => total + max, 0)}</small>
                   </strong>
                 </div>
                 <div className="score-fields">
