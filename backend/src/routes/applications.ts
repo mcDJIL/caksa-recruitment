@@ -49,6 +49,7 @@ type ApplicationScore = {
   skills_experience_achievements: number;
   identity_contact: number;
   portfolio: number;
+  special_task: number;
 };
 
 type ApplicationStatus =
@@ -577,7 +578,8 @@ router.get('/export', requireAdmin, async (request, response, next) => {
       'Skill Pengalaman, Prestasi yang relevan (20 poin)',
       'Nama, Alamat, Kontak (5 Poin)',
       'Portofolio (15 poin)',
-      'Jumlah Poin (90)',
+      'Special Task (10 poin)',
+      'Jumlah Poin (100)',
       'Prioritas penerimaan Electrical',
       'Status',
       'Noted',
@@ -618,6 +620,7 @@ router.get('/export', requireAdmin, async (request, response, next) => {
         row.skills_experience_achievements_score ?? '',
         row.identity_contact_score ?? '',
         row.portfolio_score ?? '',
+        row.special_task_score ?? '',
         row.total_score ?? '',
         row.acceptance_priority ?? '',
         row.draft_status ?? row.status,
@@ -818,6 +821,7 @@ router.patch('/:nrp/score', requireAdmin, async (request, response, next) => {
       skills_experience_achievements: 20,
       identity_contact: 5,
       portfolio: 15,
+      special_task: 10,
     };
     const score = Object.fromEntries(Object.entries(limits).map(([key, max]) => {
       const value = rawScore[key as keyof ApplicationScore];
@@ -831,7 +835,7 @@ router.patch('/:nrp/score', requireAdmin, async (request, response, next) => {
       .from('recruitment_applications')
       .update({ ...score, total_score: totalScore })
       .eq('nrp', normalizeNrp(request.params.nrp))
-      .select('nrp, idea_score, relevance_score, skills_experience_achievements_score, identity_contact_score, portfolio_score, total_score, updated_at')
+      .select('nrp, idea_score, relevance_score, skills_experience_achievements_score, identity_contact_score, portfolio_score, special_task_score, total_score, updated_at')
       .maybeSingle();
     if (error) throw error;
     if (!data) {

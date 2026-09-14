@@ -55,6 +55,6 @@ export const config = {
   smtpUser: requiredEnvironment('SMTP_USER'),
   smtpPassword: requiredEnvironment('SMTP_PASSWORD'),
   smtpFrom: requiredEnvironment('SMTP_FROM'),
-  resendApiKey: requiredEnvironment('RESEND_API_KEY'),
+  mailtrapApiKey: requiredEnvironment('MAILTRAP_API_KEY'),
   adminApiToken,
 };

@@ -8,6 +8,7 @@ import { config } from './config.js';
 import applicationsRouter from './routes/applications.js';
 import adminSessionRouter from './routes/adminSession.js';
 import googleAuthRouter from './routes/googleAuth.js';
+import mailtrapRouter from './routes/mailtrap.js';
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.get('/api/health', (_request, response) => {
 
 app.use('/api/admin-session', adminSessionRouter);
 app.use('/api/applications', applicationsRouter);
+app.use('/api/send-email', mailtrapRouter);
 app.use('/api/auth', googleAuthRouter);
 
 app.use((_request, response) => {
