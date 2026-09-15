@@ -87,6 +87,8 @@ const emptyStatusCounts = (): StatusCounts => ({
   NOT_SELECTED_INTERVIEW: 0,
 });
 
+type ScoreSort = "recent" | "score-desc" | "score-asc";
+
 type DivisionFilter =
   | "ALL"
   | "technical"
@@ -166,6 +168,7 @@ const buildApplicationsUrl = (
   statusFilter: "ALL" | ApplicationStatus,
   divisionFilter: DivisionFilter,
   subDivisionFilter: string,
+  scoreSort: ScoreSort,
 ) => {
   const url = new URL(`${API_BASE}/applications`);
   url.searchParams.set("page", String(page));
@@ -175,6 +178,7 @@ const buildApplicationsUrl = (
   if (divisionFilter !== "ALL") url.searchParams.set("wing", divisionFilter);
   if (subDivisionFilter !== "ALL")
     url.searchParams.set("division", subDivisionFilter);
+  if (scoreSort !== "recent") url.searchParams.set("sort", scoreSort);
   return url.toString();
 };
 
@@ -213,6 +217,7 @@ const fetchApplications = async (
   statusFilter: "ALL" | ApplicationStatus,
   divisionFilter: DivisionFilter,
   subDivisionFilter: string,
+  scoreSort: ScoreSort,
 ): Promise<{
   applications: RecruitmentApplication[];
   pagination: PaginationData;
@@ -225,6 +230,7 @@ const fetchApplications = async (
       statusFilter,
       divisionFilter,
       subDivisionFilter,
+      scoreSort,
     ),
     { credentials: "include" },
   );
@@ -278,6 +284,13 @@ function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isSendingInterviewEmail, setIsSendingInterviewEmail] = useState(false);
+  const [isSendingRejectionEmail, setIsSendingRejectionEmail] = useState(false);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [isAdministrationEmailPanelOpen, setIsAdministrationEmailPanelOpen] =
+    useState(false);
+  const [testPassEmail, setTestPassEmail] = useState("");
+  const [testRejectionEmail, setTestRejectionEmail] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [applications, setApplications] = useState<RecruitmentApplication[]>(
     [],
@@ -298,6 +311,7 @@ function App() {
   );
   const [divisionFilter, setDivisionFilter] = useState<DivisionFilter>("ALL");
   const [subDivisionFilter, setSubDivisionFilter] = useState("ALL");
+  const [scoreSort, setScoreSort] = useState<ScoreSort>("recent");
   const [updatingNrp, setUpdatingNrp] = useState("");
   const [selectedApplication, setSelectedApplication] =
     useState<RecruitmentApplication | null>(null);
@@ -336,6 +350,7 @@ function App() {
           statusFilter,
           divisionFilter,
           subDivisionFilter,
+          scoreSort,
         ),
         fetchStatusCounts(query, divisionFilter, subDivisionFilter),
       ]);
@@ -382,6 +397,7 @@ function App() {
     query,
     divisionFilter,
     subDivisionFilter,
+    scoreSort,
   ]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -674,29 +690,22 @@ function App() {
     }
   };
 
-  const handleSendEmail = async () => {
-    if (
-      !isAuthenticated ||
-      !window.confirm(
-        "Kirim email test saja ke mdjauharil29@gmail.com? Kandidat lain tidak akan menerima email.",
-      )
-    )
-      return;
-    
-    setIsSendingEmail(true);
+  const sendBroadcastEmail = async (
+    endpoint: string,
+    confirmation: string,
+    setSending: (value: boolean) => void,
+  ) => {
+    if (!isAuthenticated || !window.confirm(confirmation)) return;
+
+    setSending(true);
     setErrorMessage("");
     setNoticeMessage("");
 
     try {
-      const response = await fetch(`${API_BASE}/send-email`, {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ test: true }),
       });
-
       const result = (await response.json()) as {
         sent?: number;
         error?: string;
@@ -711,9 +720,58 @@ function App() {
         error instanceof Error ? error.message : "Gagal mengirim email",
       );
     } finally {
-      setIsSendingEmail(false);
+      setSending(false);
     }
-  }
+  };
+
+  const handleSendEmail = () =>
+    sendBroadcastEmail(
+      "/send-email",
+      "Kirim email pengumuman ke seluruh kandidat yang lolos administrasi? Technical dan R&D menerima informasi test skill dan wawancara; Non-Technical menerima informasi wawancara.",
+      setIsSendingEmail,
+    );
+
+  const handleSendInterviewEmail = () =>
+    sendBroadcastEmail(
+      "/send-email/interview-result",
+      "Kirim email kelulusan wawancara ke seluruh kandidat yang sudah diterima sebagai anggota CAKSA?",
+      setIsSendingInterviewEmail,
+    );
+
+  const handleSendRejectionEmail = () =>
+    sendBroadcastEmail(
+      "/send-email/not-selected-administration",
+      "Kirim email pengumuman ke seluruh kandidat yang tidak lolos administrasi?",
+      setIsSendingRejectionEmail,
+    );
+
+  const handleSendAdministrationTestEmails = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!isAuthenticated || !testPassEmail.trim() || !testRejectionEmail.trim()) return;
+
+    setIsSendingTestEmail(true);
+    setErrorMessage("");
+    setNoticeMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/send-email/administration-test`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          passEmail: testPassEmail,
+          rejectionEmail: testRejectionEmail,
+        }),
+      });
+      const result = (await response.json()) as { sent?: number; error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Gagal mengirim email uji");
+      setNoticeMessage(`${result.sent ?? 0} email uji berhasil dikirim.`);
+      setIsAdministrationEmailPanelOpen(false);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Gagal mengirim email uji");
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
 
   const activeStatus = (
     application: RecruitmentApplication,
@@ -848,10 +906,18 @@ function App() {
             <button
               className="email-button"
               type="button"
-              onClick={() => void handleSendEmail()}
-              disabled={isSendingEmail || isRefreshing}
+              onClick={() => setIsAdministrationEmailPanelOpen(true)}
+              disabled={isSendingEmail || isSendingInterviewEmail || isSendingRejectionEmail || isSendingTestEmail || isRefreshing}
             >
-              {isSendingEmail ? "Mengirim test email…" : "Kirim test email"}
+              Email administrasi
+            </button>
+            <button
+              className="email-button interview-email-button"
+              type="button"
+              onClick={() => void handleSendInterviewEmail()}
+              disabled={isSendingEmail || isSendingInterviewEmail || isSendingRejectionEmail || isSendingTestEmail || isRefreshing}
+            >
+              {isSendingInterviewEmail ? "Mengirim email…" : "Kirim email lolos wawancara"}
             </button>
             <button
               className="primary-button compact"
@@ -940,6 +1006,18 @@ function App() {
                     {division.label}
                   </option>
                 ))}
+              </select>
+              <select
+                value={scoreSort}
+                onChange={(event) => {
+                  setPagination((item) => ({ ...item, page: 1 }));
+                  setScoreSort(event.target.value as ScoreSort);
+                }}
+                aria-label="Urutkan kandidat"
+              >
+                <option value="recent">Terbaru</option>
+                <option value="score-desc">Total score tertinggi</option>
+                <option value="score-asc">Total score terendah</option>
               </select>
               <select
                 value={subDivisionFilter}
@@ -1105,6 +1183,84 @@ function App() {
           </footer>
         </section>
       </div>
+
+      {isAdministrationEmailPanelOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setIsAdministrationEmailPanelOpen(false)}
+        >
+          <aside
+            className="detail-panel email-test-panel"
+            onClick={(event) => event.stopPropagation()}
+            aria-modal="true"
+            role="dialog"
+            aria-labelledby="administration-email-title"
+          >
+            <header>
+              <div>
+                <p className="eyebrow">Administration email</p>
+                <h2 id="administration-email-title">Kirim email seleksi</h2>
+              </div>
+              <button
+                type="button"
+                className="close-button"
+                onClick={() => setIsAdministrationEmailPanelOpen(false)}
+                aria-label="Tutup email administrasi"
+              >
+                ×
+              </button>
+            </header>
+            <div className="detail-content">
+              <p className="email-test-lead">
+                Pilih pengiriman massal, atau isi dua alamat untuk mengetes email lolos dan tidak lolos.
+              </p>
+              <div className="email-broadcast-actions">
+                <button
+                  className="email-button"
+                  type="button"
+                  onClick={() => void handleSendEmail()}
+                  disabled={isSendingEmail || isSendingRejectionEmail || isSendingTestEmail}
+                >
+                  {isSendingEmail ? "Mengirim email…" : "Kirim semua yang lolos"}
+                </button>
+                <button
+                  className="rejection-email-button"
+                  type="button"
+                  onClick={() => void handleSendRejectionEmail()}
+                  disabled={isSendingEmail || isSendingRejectionEmail || isSendingTestEmail}
+                >
+                  {isSendingRejectionEmail ? "Mengirim email…" : "Kirim semua yang tidak lolos"}
+                </button>
+              </div>
+              <form className="email-test-form" onSubmit={handleSendAdministrationTestEmails}>
+                <label>
+                  Email untuk lolos administrasi
+                  <input
+                    type="email"
+                    value={testPassEmail}
+                    onChange={(event) => setTestPassEmail(event.target.value)}
+                    placeholder="contoh@domain.com"
+                    required
+                  />
+                </label>
+                <label>
+                  Email untuk tidak lolos administrasi
+                  <input
+                    type="email"
+                    value={testRejectionEmail}
+                    onChange={(event) => setTestRejectionEmail(event.target.value)}
+                    placeholder="contoh-lain@domain.com"
+                    required
+                  />
+                </label>
+                <button className="primary-button" type="submit" disabled={isSendingTestEmail}>
+                  {isSendingTestEmail ? "Mengirim email uji…" : "Kirim 2 email uji"}
+                </button>
+              </form>
+            </div>
+          </aside>
+        </div>
+      )}
 
       {selectedApplication && (
         <div

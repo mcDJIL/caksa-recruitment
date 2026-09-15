@@ -6,7 +6,7 @@ import { config } from "../config.js"
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
+const logoContent = fs.readFileSync(path.join(__dirname, "../email/logo.png"));
 
 const transporter = nodemailer.createTransport({
   host: config.smtpHost,     // misal: smtp.gmail.com
@@ -41,5 +41,12 @@ export async function sendWelcomeEmail(to: string, name: string, nrp: string) {
     to,
     subject: "Pendaftaran Berhasil - CAKSA Recruitment 2026",
     html,
+    attachments: [
+      {
+        filename: "logo.png",
+        content: logoContent,
+        cid: "caksa-logo",
+      },
+    ],
   });
 }

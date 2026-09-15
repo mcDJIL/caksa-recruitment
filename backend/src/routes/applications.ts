@@ -62,6 +62,8 @@ type ApplicationStatus =
 
 type AcceptancePriority = 'HIGH' | 'MEDIUM' | 'LOW' | 'NOT_RECOMMENDED';
 
+type ScoreSort = 'recent' | 'score-desc' | 'score-asc';
+
 const applicationStatuses: ApplicationStatus[] = [
   'PENDING',
   'ADMINISTRATION',
@@ -120,6 +122,13 @@ const statusFromQuery = (value: unknown): ApplicationStatus | null => {
   return applicationStatuses.includes(normalized as ApplicationStatus)
     ? (normalized as ApplicationStatus)
     : null;
+};
+
+const scoreSortFromQuery = (value: unknown): ScoreSort => {
+  const normalized = parsedQueryString(value);
+  return normalized === 'score-desc' || normalized === 'score-asc'
+    ? normalized
+    : 'recent';
 };
 
 const filterCodeFromQuery = (value: unknown): string | null => {
@@ -770,12 +779,24 @@ router.get('/', requireAdmin, async (request, response, next) => {
     const status = statusFromQuery(request.query.status);
     const wing = filterCodeFromQuery(request.query.wing);
     const division = filterCodeFromQuery(request.query.division);
+    const scoreSort = scoreSortFromQuery(request.query.sort);
 
     let applicationsQuery = supabase
       .from('recruitment_applications')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, to);
+      .select('*', { count: 'exact' });
+
+    if (scoreSort === 'recent') {
+      applicationsQuery = applicationsQuery.order('created_at', { ascending: false });
+    } else {
+      applicationsQuery = applicationsQuery
+        .order('total_score', {
+          ascending: scoreSort === 'score-asc',
+          nullsFirst: false,
+        })
+        .order('created_at', { ascending: false });
+    }
+
+    applicationsQuery = applicationsQuery.range(from, to);
 
     if (query) {
       const ilike = `%${escapedForIlike(query)}%`;
