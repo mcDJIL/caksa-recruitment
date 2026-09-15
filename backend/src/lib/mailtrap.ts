@@ -52,16 +52,16 @@ const renderSelectionResultEmail = (recipient: SelectionRecipient): string => {
     ? `
       <tr>
         <td style="padding:8px 20px 16px; color:#6b7280; font-size:13px;">Skill Test</td>
-        <td align="right" style="padding:8px 20px 16px; color:#0f1b33; font-size:13px; font-weight:700;">September 18–19, 2026</td>
+        <td align="right" style="padding:8px 20px 16px; color:#0f1b33; font-size:13px; font-weight:700;">September 18, 2026</td>
       </tr>
       <tr>
         <td style="padding:8px 20px 16px; color:#6b7280; font-size:13px;">Interview</td>
-        <td align="right" style="padding:8px 20px 16px; color:#0f1b33; font-size:13px; font-weight:700;">September 20–27, 2026</td>
+        <td align="right" style="padding:8px 20px 16px; color:#0f1b33; font-size:13px; font-weight:700;">September 19–27, 2026</td>
       </tr>`
     : `
       <tr>
         <td style="padding:8px 20px 16px; color:#6b7280; font-size:13px;">Interview</td>
-        <td align="right" style="padding:8px 20px 16px; color:#0f1b33; font-size:13px; font-weight:700;">September 20–27, 2026</td>
+        <td align="right" style="padding:8px 20px 16px; color:#0f1b33; font-size:13px; font-weight:700;">September 19–27, 2026</td>
       </tr>`;
 
   return renderTemplate(selectionResultTemplate, {
