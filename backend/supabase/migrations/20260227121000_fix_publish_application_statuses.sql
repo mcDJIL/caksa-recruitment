@@ -1,26 +1,3 @@
-alter table public.recruitment_applications
-  add column if not exists draft_status text;
-
-do $$
-begin
-  alter table public.recruitment_applications
-    add constraint recruitment_applications_draft_status_check
-    check (
-      draft_status is null
-      or draft_status in (
-        'PENDING',
-        'ADMINISTRATION',
-        'INTERVIEW',
-        'MEMBER',
-        'NOT_SELECTED_ADMINISTRATION',
-        'NOT_SELECTED_INTERVIEW'
-      )
-    );
-exception
-  when duplicate_object then null;
-end;
-$$;
-
 create or replace function public.publish_application_statuses()
 returns integer
 language plpgsql

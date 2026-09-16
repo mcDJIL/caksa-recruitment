@@ -771,19 +771,44 @@ router.get('/:nrp', trackingRateLimit, async (request, response, next) => {
 
 router.get('/', requireAdmin, async (request, response, next) => {
   try {
-    const page = parsedPositiveInteger(request.query.page, 1);
+    const requestedPage = parsedPositiveInteger(request.query.page, 1);
     const limit = Math.min(parsedPositiveInteger(request.query.limit, 20), 100);
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
     const query = parsedQueryString(request.query.q);
     const status = statusFromQuery(request.query.status);
     const wing = filterCodeFromQuery(request.query.wing);
     const division = filterCodeFromQuery(request.query.division);
     const scoreSort = scoreSortFromQuery(request.query.sort);
 
+    let countQuery = supabase
+      .from('recruitment_applications')
+      .select('id', { count: 'exact', head: true });
+
+    if (query) {
+      const ilike = `%${escapedForIlike(query)}%`;
+      countQuery = countQuery.or(
+        `nrp.ilike.${ilike},full_name.ilike.${ilike},email.ilike.${ilike},study_program_code.ilike.${ilike}`,
+      );
+    }
+
+    if (status) {
+      countQuery = countQuery.or(`status.eq.${status},draft_status.eq.${status}`);
+    }
+
+    if (wing) countQuery = countQuery.eq('interested_wing_code', wing);
+    if (division) countQuery = countQuery.eq('division_code', division);
+
+    const { count, error: countError } = await countQuery;
+    if (countError) throw countError;
+
+    const total = count ?? 0;
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+    const page = Math.min(requestedPage, totalPages);
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
     let applicationsQuery = supabase
       .from('recruitment_applications')
-      .select('*', { count: 'exact' });
+      .select('*');
 
     if (scoreSort === 'recent') {
       applicationsQuery = applicationsQuery.order('created_at', { ascending: false });
@@ -795,8 +820,6 @@ router.get('/', requireAdmin, async (request, response, next) => {
         })
         .order('created_at', { ascending: false });
     }
-
-    applicationsQuery = applicationsQuery.range(from, to);
 
     if (query) {
       const ilike = `%${escapedForIlike(query)}%`;
@@ -812,12 +835,9 @@ router.get('/', requireAdmin, async (request, response, next) => {
     if (wing) applicationsQuery = applicationsQuery.eq('interested_wing_code', wing);
     if (division) applicationsQuery = applicationsQuery.eq('division_code', division);
 
-    const { data, error, count } = await applicationsQuery;
+    const { data, error } = await applicationsQuery.range(from, to);
 
     if (error) throw error;
-
-    const total = count ?? 0;
-    const totalPages = Math.max(Math.ceil(total / limit), 1);
 
     response.json({
       applications: data ?? [],
