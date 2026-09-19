@@ -1116,3 +1116,116 @@ td span {
     text-align: left;
   }
 }
+@media (max-width: 420px) {
+  .topbar-inner,
+  .dashboard-shell {
+    width: calc(100% - 20px);
+  }
+  .topbar-inner {
+    min-height: 58px;
+  }
+  .brand {
+    gap: 6px;
+    font-size: 16px;
+  }
+  .brand-mark {
+    width: 19px;
+    height: 18px;
+  }
+  .brand-mark i {
+    width: 5px;
+  }
+  .brand-mark i:nth-child(1) {
+    height: 7px;
+  }
+  .brand-mark i:nth-child(2) {
+    height: 13px;
+  }
+  .brand-mark i:nth-child(3) {
+    height: 18px;
+  }
+  .dashboard-shell {
+    padding-top: 24px;
+  }
+  .page-heading h1 {
+    font-size: 50px;
+  }
+  .page-heading h1 + p {
+    font-size: 12px;
+  }
+  .heading-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+  .heading-actions button {
+    width: 100%;
+  }
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+  .metric-total {
+    grid-column: auto;
+  }
+  .panel-toolbar {
+    padding: 16px;
+  }
+  .panel-title h2 {
+    font-size: 27px;
+  }
+  .filters {
+    grid-template-columns: 1fr;
+  }
+  .panel-alert {
+    margin-left: 16px;
+    margin-right: 16px;
+    overflow-wrap: anywhere;
+  }
+  .panel-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .detail-panel > header,
+  .detail-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .detail-panel h2 {
+    max-width: calc(100vw - 88px);
+    font-size: 32px;
+    overflow-wrap: anywhere;
+  }
+  .detail-content {
+    padding-top: 22px;
+    padding-bottom: 30px;
+  }
+  .detail-grid {
+    gap: 15px;
+  }
+  .document-list article {
+    gap: 8px;
+  }
+  .document-list strong,
+  .document-list a,
+  .document-list article span,
+  .detail-grid p {
+    overflow-wrap: anywhere;
+  }
+  .score-card {
+    padding: 15px;
+  }
+  .score-heading h3 {
+    font-size: 21px;
+  }
+  .score-fields label {
+    align-items: flex-start;
+  }
+  .score-fields label span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .email-test-panel .detail-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

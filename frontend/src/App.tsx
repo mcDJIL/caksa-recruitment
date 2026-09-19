@@ -853,14 +853,14 @@ function App() {
   return (
     <main className="dashboard-page">
       <header className="topbar">
-        <div className="topbar-inner">
+        <div className="topbar-inner max-[420px]:gap-3 max-[420px]:px-3">
           <div className="brand">
             <Mark />
             <span>
               CAKSA <b>/ OPS</b>
             </span>
           </div>
-          <div className="topbar-meta">
+          <div className="topbar-meta max-[420px]:gap-2 max-[420px]:text-[10px]">
             <span className="live-indicator">
               <i />
               Sistem aktif
@@ -877,7 +877,7 @@ function App() {
         </div>
       </header>
       <div className="dashboard-shell">
-        <section className="page-heading">
+        <section className="page-heading max-[420px]:gap-5">
           <div>
             <p className="eyebrow">Candidate overview</p>
             <h1>Ruang seleksi.</h1>
@@ -886,7 +886,7 @@ function App() {
               terarah.
             </p>
           </div>
-          <div className="heading-actions">
+          <div className="heading-actions flex-wrap max-[420px]:grid max-[420px]:grid-cols-1">
             <button
               className="secondary-button"
               type="button"
@@ -931,7 +931,7 @@ function App() {
           </div>
         </section>
 
-        <section className="metrics" aria-label="Ringkasan pendaftar">
+        <section className="metrics max-[420px]:grid-cols-1" aria-label="Ringkasan pendaftar">
           <article className="metric-card metric-total">
             <p>Total kandidat</p>
             <strong>{pagination.total}</strong>
@@ -953,13 +953,13 @@ function App() {
           ))}
         </section>
 
-        <section className="data-panel">
-          <div className="panel-toolbar">
+        <section className="data-panel min-w-0">
+          <div className="panel-toolbar min-w-0 max-[420px]:p-4">
             <div className="panel-title">
               <p className="eyebrow">Manifest</p>
               <h2>Daftar pendaftar</h2>
             </div>
-            <div className="filters">
+            <div className="filters min-w-0 max-[420px]:gap-2">
               <label className="search-field">
                 <span aria-hidden="true">⌕</span>
                 <input
@@ -1190,7 +1190,7 @@ function App() {
           onClick={() => setIsAdministrationEmailPanelOpen(false)}
         >
           <aside
-            className="detail-panel email-test-panel"
+            className="detail-panel email-test-panel max-[420px]:w-full"
             onClick={(event) => event.stopPropagation()}
             aria-modal="true"
             role="dialog"
@@ -1268,7 +1268,7 @@ function App() {
           onClick={() => setSelectedApplication(null)}
         >
           <aside
-            className="detail-panel"
+            className="detail-panel max-[420px]:w-full"
             onClick={(event) => event.stopPropagation()}
             aria-modal="true"
             role="dialog"
@@ -1277,7 +1277,7 @@ function App() {
             <header>
               <div>
                 <p className="eyebrow">Candidate file</p>
-                <h2 id="detail-name">{selectedApplication.full_name}</h2>
+                <h2 id="detail-name" className="break-words">{selectedApplication.full_name}</h2>
                 <span className="detail-nrp">{selectedApplication.nrp}</span>
               </div>
               <button
@@ -1474,7 +1474,7 @@ function App() {
                   target="_blank"
                   rel="noreferrer"
                   href={selectedApplication.portfolio_url}
-                  className="text-sm"
+                  className="text-sm break-all"
                 >
                   {selectedApplication?.portfolio_url ?? "-"}
                 </a>
@@ -1485,7 +1485,7 @@ function App() {
                   target="_blank"
                   rel="noreferrer"
                   href={selectedApplication.special_task_url}
-                  className="text-sm"
+                  className="text-sm break-all"
                 >
                   {selectedApplication?.special_task_url ?? "-"}
                 </a>
