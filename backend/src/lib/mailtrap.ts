@@ -17,6 +17,10 @@ const interviewResultTemplate = fs.readFileSync(
   path.join(__dirname, "../email/interview-result-email.html"),
   "utf-8",
 );
+const interviewRejectionTemplate = fs.readFileSync(
+  path.join(__dirname, "../email/interview-rejection-email.html"),
+  "utf-8",
+);
 const logoContent = fs.readFileSync(path.join(__dirname, "../email/logo.png"));
 
 const client = new MailtrapClient({ token: config.mailtrapApiKey, bulk: true });
@@ -26,6 +30,11 @@ type SelectionRecipient = {
   email: string;
   fullName: string;
   interestedWingCode: string;
+};
+
+type InterviewResultRecipient = SelectionRecipient & {
+  interestedWingName: string;
+  divisionName: string;
 };
 
 const escapeHtml = (value: string): string =>
@@ -68,6 +77,8 @@ const renderSelectionResultEmail = (recipient: SelectionRecipient): string => {
     fullName: escapeHtml(recipient.fullName),
     nextStages,
     scheduleDetails,
+    welcomePartyDate: "October 2, 2026 at 18:00",
+    whatsappGroupLink: escapeHtml(config.whatsappGroupLink),
   });
 };
 
@@ -76,15 +87,24 @@ const renderAdministrationRejectionEmail = (fullName: string): string =>
     fullName: escapeHtml(fullName),
   });
 
-const renderInterviewResultEmail = (fullName: string): string =>
+const renderInterviewResultEmail = (recipient: InterviewResultRecipient): string =>
   renderTemplate(interviewResultTemplate, {
+    fullName: escapeHtml(recipient.fullName),
+    interestedWingName: escapeHtml(recipient.interestedWingName),
+    divisionName: escapeHtml(recipient.divisionName),
+    welcomePartyDate: "October 5, 2026 at 18:00",
+    whatsappGroupLink: escapeHtml("https://chat.whatsapp.com/EowXheLeDKPLT3VrGYYvcG?s=cl&p=a&mlu=4&ilr=4"),
+  });
+
+const renderInterviewRejectionEmail = (fullName: string): string =>
+  renderTemplate(interviewRejectionTemplate, {
     fullName: escapeHtml(fullName),
   });
 
-const sendEmails = async (
-  recipients: SelectionRecipient[],
+const sendEmails = async <Recipient extends SelectionRecipient>(
+  recipients: Recipient[],
   subject: string,
-  render: (recipient: SelectionRecipient) => string,
+  render: (recipient: Recipient) => string,
 ) => {
   await Promise.all(
     recipients.map((recipient) =>
@@ -123,10 +143,18 @@ export async function sendAdministrationRejectionEmails(recipients: SelectionRec
   );
 }
 
-export async function sendInterviewResultEmails(recipients: SelectionRecipient[]) {
+export async function sendInterviewResultEmails(recipients: InterviewResultRecipient[]) {
   await sendEmails(
     recipients,
     "Congratulations! You Passed the Interview — CAKSA Recruitment 2026",
-    (recipient) => renderInterviewResultEmail(recipient.fullName),
+    renderInterviewResultEmail,
+  );
+}
+
+export async function sendInterviewRejectionEmails(recipients: SelectionRecipient[]) {
+  await sendEmails(
+    recipients,
+    "CAKSA Interview Selection Result: Recruitment 2026",
+    (recipient) => renderInterviewRejectionEmail(recipient.fullName),
   );
 }

@@ -4,7 +4,6 @@ import "./App.css";
 type ApplicationStatus =
   | "PENDING"
   | "ADMINISTRATION"
-  | "INTERVIEW"
   | "MEMBER"
   | "NOT_SELECTED_ADMINISTRATION"
   | "NOT_SELECTED_INTERVIEW";
@@ -81,7 +80,6 @@ type ApplicationSummaryResponse = {
 const emptyStatusCounts = (): StatusCounts => ({
   PENDING: 0,
   ADMINISTRATION: 0,
-  INTERVIEW: 0,
   MEMBER: 0,
   NOT_SELECTED_ADMINISTRATION: 0,
   NOT_SELECTED_INTERVIEW: 0,
@@ -130,7 +128,6 @@ const API_BASE = (
 const statusOptions: ApplicationStatus[] = [
   "PENDING",
   "ADMINISTRATION",
-  "INTERVIEW",
   "MEMBER",
   "NOT_SELECTED_ADMINISTRATION",
   "NOT_SELECTED_INTERVIEW",
@@ -139,7 +136,6 @@ const statusOptions: ApplicationStatus[] = [
 const statusLabel: Record<ApplicationStatus, string> = {
   PENDING: "Pending",
   ADMINISTRATION: "Administrasi",
-  INTERVIEW: "Wawancara",
   MEMBER: "Member",
   NOT_SELECTED_ADMINISTRATION: "Tidak lolos administrasi",
   NOT_SELECTED_INTERVIEW: "Tidak lolos wawancara",
@@ -148,7 +144,6 @@ const statusLabel: Record<ApplicationStatus, string> = {
 const statusTone: Record<ApplicationStatus, string> = {
   PENDING: "pending",
   ADMINISTRATION: "administration",
-  INTERVIEW: "interview",
   MEMBER: "member",
   NOT_SELECTED_ADMINISTRATION: "not-selected",
   NOT_SELECTED_INTERVIEW: "not-selected",
@@ -285,12 +280,18 @@ function App() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isSendingInterviewEmail, setIsSendingInterviewEmail] = useState(false);
+  const [isSendingInterviewRejectionEmail, setIsSendingInterviewRejectionEmail] = useState(false);
   const [isSendingRejectionEmail, setIsSendingRejectionEmail] = useState(false);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [isSendingInterviewTestEmail, setIsSendingInterviewTestEmail] =
+    useState(false);
   const [isAdministrationEmailPanelOpen, setIsAdministrationEmailPanelOpen] =
+    useState(false);
+  const [isInterviewEmailPanelOpen, setIsInterviewEmailPanelOpen] =
     useState(false);
   const [testPassEmail, setTestPassEmail] = useState("");
   const [testRejectionEmail, setTestRejectionEmail] = useState("");
+  const [testInterviewEmail, setTestInterviewEmail] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
   const [applications, setApplications] = useState<RecruitmentApplication[]>(
     [],
@@ -738,6 +739,13 @@ function App() {
       setIsSendingInterviewEmail,
     );
 
+  const handleSendInterviewRejectionEmail = () =>
+    sendBroadcastEmail(
+      "/send-email/not-selected-interview",
+      "Kirim email hasil wawancara ke seluruh kandidat yang tidak lolos?",
+      setIsSendingInterviewRejectionEmail,
+    );
+
   const handleSendRejectionEmail = () =>
     sendBroadcastEmail(
       "/send-email/not-selected-administration",
@@ -770,6 +778,37 @@ function App() {
       setErrorMessage(error instanceof Error ? error.message : "Gagal mengirim email uji");
     } finally {
       setIsSendingTestEmail(false);
+    }
+  };
+
+  const handleSendInterviewTestEmail = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAuthenticated || !testInterviewEmail.trim()) return;
+
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const endpoint =
+      submitter instanceof HTMLButtonElement && submitter.value === "rejection"
+        ? "interview-rejection-test"
+        : "interview-result-test";
+
+    setIsSendingInterviewTestEmail(true);
+    setErrorMessage("");
+    setNoticeMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/send-email/${endpoint}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: testInterviewEmail }),
+      });
+      const result = (await response.json()) as { sent?: number; error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Gagal mengirim email uji");
+      setNoticeMessage(`${result.sent ?? 0} email uji berhasil dikirim.`);
+      setIsInterviewEmailPanelOpen(false);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Gagal mengirim email uji");
+    } finally {
+      setIsSendingInterviewTestEmail(false);
     }
   };
 
@@ -907,17 +946,17 @@ function App() {
               className="email-button"
               type="button"
               onClick={() => setIsAdministrationEmailPanelOpen(true)}
-              disabled={isSendingEmail || isSendingInterviewEmail || isSendingRejectionEmail || isSendingTestEmail || isRefreshing}
+              disabled={isSendingEmail || isSendingInterviewEmail || isSendingInterviewRejectionEmail || isSendingRejectionEmail || isSendingTestEmail || isSendingInterviewTestEmail || isRefreshing}
             >
               Email administrasi
             </button>
             <button
               className="email-button interview-email-button"
               type="button"
-              onClick={() => void handleSendInterviewEmail()}
-              disabled={isSendingEmail || isSendingInterviewEmail || isSendingRejectionEmail || isSendingTestEmail || isRefreshing}
+              onClick={() => setIsInterviewEmailPanelOpen(true)}
+              disabled={isSendingEmail || isSendingInterviewEmail || isSendingInterviewRejectionEmail || isSendingRejectionEmail || isSendingTestEmail || isSendingInterviewTestEmail || isRefreshing}
             >
-              {isSendingInterviewEmail ? "Mengirim email…" : "Kirim email lolos wawancara"}
+              Email hasil wawancara
             </button>
             <button
               className="primary-button compact"
@@ -1256,6 +1295,89 @@ function App() {
                 <button className="primary-button" type="submit" disabled={isSendingTestEmail}>
                   {isSendingTestEmail ? "Mengirim email uji…" : "Kirim 2 email uji"}
                 </button>
+              </form>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {isInterviewEmailPanelOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setIsInterviewEmailPanelOpen(false)}
+        >
+          <aside
+            className="detail-panel email-test-panel max-[420px]:w-full"
+            onClick={(event) => event.stopPropagation()}
+            aria-modal="true"
+            role="dialog"
+            aria-labelledby="interview-email-title"
+          >
+            <header>
+              <div>
+                <p className="eyebrow">Interview result email</p>
+                <h2 id="interview-email-title">Kirim email hasil wawancara</h2>
+              </div>
+              <button
+                type="button"
+                className="close-button"
+                onClick={() => setIsInterviewEmailPanelOpen(false)}
+                aria-label="Tutup email hasil wawancara"
+              >
+                ×
+              </button>
+            </header>
+            <div className="detail-content">
+              <p className="email-test-lead">
+                Kirim email massal untuk kandidat yang lolos atau tidak lolos, atau uji email wawancara ke satu alamat terlebih dahulu.
+              </p>
+              <div className="email-broadcast-actions">
+                <button
+                  className="email-button interview-email-button"
+                  type="button"
+                  onClick={() => void handleSendInterviewEmail()}
+                  disabled={isSendingInterviewEmail || isSendingInterviewRejectionEmail || isSendingInterviewTestEmail}
+                >
+                  {isSendingInterviewEmail ? "Mengirim email…" : "Kirim semua yang lolos wawancara"}
+                </button>
+                <button
+                  className="rejection-email-button"
+                  type="button"
+                  onClick={() => void handleSendInterviewRejectionEmail()}
+                  disabled={isSendingInterviewEmail || isSendingInterviewRejectionEmail || isSendingInterviewTestEmail}
+                >
+                  {isSendingInterviewRejectionEmail ? "Mengirim email…" : "Kirim semua yang tidak lolos wawancara"}
+                </button>
+              </div>
+              <form className="email-test-form" onSubmit={handleSendInterviewTestEmail}>
+                <label>
+                  Email untuk uji hasil wawancara
+                  <input
+                    type="email"
+                    value={testInterviewEmail}
+                    onChange={(event) => setTestInterviewEmail(event.target.value)}
+                    placeholder="contoh@domain.com"
+                    required
+                  />
+                </label>
+                <div className="email-broadcast-actions">
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    value="accepted"
+                    disabled={isSendingInterviewTestEmail}
+                  >
+                    {isSendingInterviewTestEmail ? "Mengirim email uji…" : "Uji email kandidat lolos"}
+                  </button>
+                  <button
+                    className="rejection-email-button"
+                    type="submit"
+                    value="rejection"
+                    disabled={isSendingInterviewTestEmail}
+                  >
+                    {isSendingInterviewTestEmail ? "Mengirim email uji…" : "Uji email kandidat tidak lolos"}
+                  </button>
+                </div>
               </form>
             </div>
           </aside>
