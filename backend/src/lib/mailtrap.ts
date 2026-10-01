@@ -77,7 +77,7 @@ const renderSelectionResultEmail = (recipient: SelectionRecipient): string => {
     fullName: escapeHtml(recipient.fullName),
     nextStages,
     scheduleDetails,
-    welcomePartyDate: "October 2, 2026 at 18:00",
+    welcomePartyDate: "October 2, 2026 at 19:00",
     whatsappGroupLink: escapeHtml(config.whatsappGroupLink),
   });
 };
@@ -92,7 +92,7 @@ const renderInterviewResultEmail = (recipient: InterviewResultRecipient): string
     fullName: escapeHtml(recipient.fullName),
     interestedWingName: escapeHtml(recipient.interestedWingName),
     divisionName: escapeHtml(recipient.divisionName),
-    welcomePartyDate: "October 5, 2026 at 18:00",
+    welcomePartyDate: "October 2, 2026 at 19:00",
     whatsappGroupLink: escapeHtml("https://chat.whatsapp.com/EowXheLeDKPLT3VrGYYvcG?s=cl&p=a&mlu=4&ilr=4"),
   });
 
